@@ -1,223 +1,291 @@
--- ═══════════════════════════════════════════════════════════════════════════
--- Milestara — Supabase Database Schema
--- 
--- HOW TO USE:
---   1. Go to https://supabase.com → your project → SQL Editor
---   2. Paste this entire file
---   3. Click "Run"
---   4. Done — all tables, constraints, policies, and functions are created.
---
--- Run this in ONE GO. It is fully idempotent (safe to run multiple times).
--- ═══════════════════════════════════════════════════════════════════════════
+-- ═══════════════════════════════════════════════════════════════════════════════
+-- Milestara — Production SQL Schema v2
+-- Paste this entire file into Supabase SQL Editor → Run
+-- Safe to run multiple times (idempotent)
+-- ═══════════════════════════════════════════════════════════════════════════════
 
--- Enable UUID generation (already enabled on Supabase by default)
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- EXTENSIONS
+-- ─────────────────────────────────────────────────────────────────────────────
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
 
 -- ─────────────────────────────────────────────────────────────────────────────
--- TABLE: users
--- Identity is the BCH wallet address — no email/password needed.
+-- TABLE 1: users
+-- Wallet address = identity (Web3 pattern, no email/password)
 -- ─────────────────────────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS users (
     id             UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
     wallet_address TEXT        UNIQUE NOT NULL,
+    role           TEXT        NOT NULL DEFAULT 'investor'
+                               CHECK (role IN ('investor', 'creator', 'admin')),
     created_at     TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
 ALTER TABLE users ENABLE ROW LEVEL SECURITY;
 
-DROP POLICY IF EXISTS "users_public_read"   ON users;
-DROP POLICY IF EXISTS "users_public_insert" ON users;
+DROP POLICY IF EXISTS "users: public read"          ON users;
+DROP POLICY IF EXISTS "users: insert for all"       ON users;
+DROP POLICY IF EXISTS "users: update own"           ON users;
 
-CREATE POLICY "users_public_read"
+CREATE POLICY "users: public read"
     ON users FOR SELECT
     USING (true);
 
-CREATE POLICY "users_public_insert"
+CREATE POLICY "users: insert for all"
     ON users FOR INSERT
     WITH CHECK (true);
 
+CREATE POLICY "users: update own"
+    ON users FOR UPDATE
+    USING (true);
+
 
 -- ─────────────────────────────────────────────────────────────────────────────
--- TABLE: projects
+-- TABLE 2: projects
+-- Uses owner_wallet directly — no FK to users (allows anonymous projects)
 -- ─────────────────────────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS projects (
-    id             UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
-    creator_id     UUID        NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    title          TEXT        NOT NULL,
-    description    TEXT        NOT NULL DEFAULT '',
-    funding_target NUMERIC(18, 8) NOT NULL CHECK (funding_target > 0),
-    funded_amount  NUMERIC(18, 8) NOT NULL DEFAULT 0 CHECK (funded_amount >= 0),
-    status         TEXT        NOT NULL DEFAULT 'active'
-                               CHECK (status IN ('active', 'completed', 'cancelled')),
-    created_at     TIMESTAMPTZ NOT NULL DEFAULT now()
+    id           UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+    title        TEXT        NOT NULL,
+    description  TEXT        NOT NULL DEFAULT '',
+    goal_amount  NUMERIC(18,8) NOT NULL CHECK (goal_amount > 0),
+    raised_amount NUMERIC(18,8) NOT NULL DEFAULT 0 CHECK (raised_amount >= 0),
+    owner_wallet TEXT        NOT NULL,
+    status       TEXT        NOT NULL DEFAULT 'active'
+                             CHECK (status IN ('active', 'funded', 'completed', 'cancelled')),
+    created_at   TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE INDEX IF NOT EXISTS idx_projects_creator_id ON projects(creator_id);
-CREATE INDEX IF NOT EXISTS idx_projects_status     ON projects(status);
-CREATE INDEX IF NOT EXISTS idx_projects_created_at ON projects(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_projects_owner_wallet ON projects(owner_wallet);
+CREATE INDEX IF NOT EXISTS idx_projects_status       ON projects(status);
+CREATE INDEX IF NOT EXISTS idx_projects_created_at   ON projects(created_at DESC);
 
 ALTER TABLE projects ENABLE ROW LEVEL SECURITY;
 
-DROP POLICY IF EXISTS "projects_public_read"   ON projects;
-DROP POLICY IF EXISTS "projects_public_insert" ON projects;
-DROP POLICY IF EXISTS "projects_public_update" ON projects;
+DROP POLICY IF EXISTS "projects: public read"   ON projects;
+DROP POLICY IF EXISTS "projects: insert for all" ON projects;
+DROP POLICY IF EXISTS "projects: update own"    ON projects;
 
-CREATE POLICY "projects_public_read"
+CREATE POLICY "projects: public read"
     ON projects FOR SELECT
     USING (true);
 
-CREATE POLICY "projects_public_insert"
+CREATE POLICY "projects: insert for all"
     ON projects FOR INSERT
     WITH CHECK (true);
 
-CREATE POLICY "projects_public_update"
+CREATE POLICY "projects: update own"
     ON projects FOR UPDATE
     USING (true);
 
 
 -- ─────────────────────────────────────────────────────────────────────────────
--- TABLE: milestones
+-- TABLE 3: milestones
 -- ─────────────────────────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS milestones (
-    id               UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
-    project_id       UUID        NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
-    title            TEXT        NOT NULL,
-    description      TEXT        NOT NULL DEFAULT '',
-    amount_allocated NUMERIC(18, 8) NOT NULL CHECK (amount_allocated > 0),
-    status           TEXT        NOT NULL DEFAULT 'pending'
-                                 CHECK (status IN ('pending', 'voting', 'approved', 'released', 'rejected')),
-    created_at       TIMESTAMPTZ NOT NULL DEFAULT now()
+    id          UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+    project_id  UUID        NOT NULL
+                            REFERENCES projects(id) ON DELETE CASCADE,
+    title       TEXT        NOT NULL,
+    description TEXT        NOT NULL DEFAULT '',
+    amount      NUMERIC(18,8) NOT NULL CHECK (amount > 0),
+    approved    BOOLEAN     NOT NULL DEFAULT false,
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
 CREATE INDEX IF NOT EXISTS idx_milestones_project_id ON milestones(project_id);
-CREATE INDEX IF NOT EXISTS idx_milestones_status     ON milestones(status);
+CREATE INDEX IF NOT EXISTS idx_milestones_approved   ON milestones(approved);
 
 ALTER TABLE milestones ENABLE ROW LEVEL SECURITY;
 
-DROP POLICY IF EXISTS "milestones_public_read"   ON milestones;
-DROP POLICY IF EXISTS "milestones_public_insert" ON milestones;
-DROP POLICY IF EXISTS "milestones_public_update" ON milestones;
+DROP POLICY IF EXISTS "milestones: public read"    ON milestones;
+DROP POLICY IF EXISTS "milestones: insert for all" ON milestones;
+DROP POLICY IF EXISTS "milestones: update for all" ON milestones;
 
-CREATE POLICY "milestones_public_read"
+CREATE POLICY "milestones: public read"
     ON milestones FOR SELECT
     USING (true);
 
-CREATE POLICY "milestones_public_insert"
+CREATE POLICY "milestones: insert for all"
     ON milestones FOR INSERT
     WITH CHECK (true);
 
-CREATE POLICY "milestones_public_update"
+CREATE POLICY "milestones: update for all"
     ON milestones FOR UPDATE
     USING (true);
 
 
 -- ─────────────────────────────────────────────────────────────────────────────
--- TABLE: votes
--- UNIQUE(milestone_id, voter_id) ensures one vote per user per milestone.
--- voting_power supports token-weighted governance (GOV tokens from Week 3).
--- ─────────────────────────────────────────────────────────────────────────────
-CREATE TABLE IF NOT EXISTS votes (
-    id           UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
-    milestone_id UUID        NOT NULL REFERENCES milestones(id) ON DELETE CASCADE,
-    voter_id     UUID        NOT NULL REFERENCES users(id)      ON DELETE CASCADE,
-    vote         BOOLEAN     NOT NULL,   -- TRUE = YES, FALSE = NO
-    voting_power INTEGER     NOT NULL DEFAULT 1 CHECK (voting_power >= 1),
-    created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
-
-    CONSTRAINT votes_unique_per_user_milestone UNIQUE (milestone_id, voter_id)
-);
-
-CREATE INDEX IF NOT EXISTS idx_votes_milestone_id ON votes(milestone_id);
-CREATE INDEX IF NOT EXISTS idx_votes_voter_id     ON votes(voter_id);
-
-ALTER TABLE votes ENABLE ROW LEVEL SECURITY;
-
-DROP POLICY IF EXISTS "votes_public_read"   ON votes;
-DROP POLICY IF EXISTS "votes_public_insert" ON votes;
-
-CREATE POLICY "votes_public_read"
-    ON votes FOR SELECT
-    USING (true);
-
-CREATE POLICY "votes_public_insert"
-    ON votes FOR INSERT
-    WITH CHECK (true);
-
-
--- ─────────────────────────────────────────────────────────────────────────────
--- TABLE: transactions
--- Records every on-chain BCH transaction for audit trail.
+-- TABLE 4: transactions
+-- Records every on-chain BCH event (fund / release / refund)
 -- ─────────────────────────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS transactions (
-    id         UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
-    project_id UUID        NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
-    tx_hash    TEXT        NOT NULL,
-    amount     NUMERIC(18, 8) NOT NULL CHECK (amount > 0),
-    type       TEXT        NOT NULL
-               CHECK (type IN ('funding', 'release', 'refund')),
-    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    id             UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+    project_id     UUID        NOT NULL
+                               REFERENCES projects(id) ON DELETE CASCADE,
+    wallet_address TEXT        NOT NULL,
+    tx_hash        TEXT        NOT NULL,
+    amount         NUMERIC(18,8) NOT NULL CHECK (amount > 0),
+    type           TEXT        NOT NULL
+                               CHECK (type IN ('funding', 'release', 'refund')),
+    created_at     TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE INDEX IF NOT EXISTS idx_transactions_project_id ON transactions(project_id);
-CREATE INDEX IF NOT EXISTS idx_transactions_type       ON transactions(type);
-CREATE INDEX IF NOT EXISTS idx_transactions_created_at ON transactions(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_transactions_project_id     ON transactions(project_id);
+CREATE INDEX IF NOT EXISTS idx_transactions_wallet_address ON transactions(wallet_address);
+CREATE INDEX IF NOT EXISTS idx_transactions_type           ON transactions(type);
+CREATE INDEX IF NOT EXISTS idx_transactions_created_at     ON transactions(created_at DESC);
 
 ALTER TABLE transactions ENABLE ROW LEVEL SECURITY;
 
-DROP POLICY IF EXISTS "transactions_public_read"   ON transactions;
-DROP POLICY IF EXISTS "transactions_public_insert" ON transactions;
+DROP POLICY IF EXISTS "transactions: public read"    ON transactions;
+DROP POLICY IF EXISTS "transactions: insert for all" ON transactions;
 
-CREATE POLICY "transactions_public_read"
+CREATE POLICY "transactions: public read"
     ON transactions FOR SELECT
     USING (true);
 
-CREATE POLICY "transactions_public_insert"
+CREATE POLICY "transactions: insert for all"
     ON transactions FOR INSERT
     WITH CHECK (true);
 
 
 -- ─────────────────────────────────────────────────────────────────────────────
--- POSTGRES FUNCTION: increment_funded_amount
---
--- Used by updateFundedAmount() in src/lib/db/projects.js.
--- This is an ATOMIC operation — safe under concurrent funding.
--- Two users funding at the exact same moment will NOT lose data.
+-- TABLE 5: votes
+-- Token-weighted voting — one wallet per milestone (enforced by UNIQUE)
 -- ─────────────────────────────────────────────────────────────────────────────
-CREATE OR REPLACE FUNCTION increment_funded_amount(project_id UUID, amount NUMERIC)
+CREATE TABLE IF NOT EXISTS votes (
+    id             UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+    milestone_id   UUID        NOT NULL
+                               REFERENCES milestones(id) ON DELETE CASCADE,
+    wallet_address TEXT        NOT NULL,
+    vote           BOOLEAN     NOT NULL,     -- true = YES, false = NO
+    token_amount   NUMERIC     NOT NULL DEFAULT 1 CHECK (token_amount >= 1),
+    created_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
+
+    -- One wallet = one vote per milestone
+    CONSTRAINT votes_unique_wallet_milestone UNIQUE (milestone_id, wallet_address)
+);
+
+CREATE INDEX IF NOT EXISTS idx_votes_milestone_id   ON votes(milestone_id);
+CREATE INDEX IF NOT EXISTS idx_votes_wallet_address ON votes(wallet_address);
+
+ALTER TABLE votes ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "votes: public read"    ON votes;
+DROP POLICY IF EXISTS "votes: insert for all" ON votes;
+
+CREATE POLICY "votes: public read"
+    ON votes FOR SELECT
+    USING (true);
+
+CREATE POLICY "votes: insert for all"
+    ON votes FOR INSERT
+    WITH CHECK (true);
+
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- FUNCTION: increment_raised_amount
+-- Atomic add to raised_amount — prevents race conditions on concurrent funding
+-- ─────────────────────────────────────────────────────────────────────────────
+CREATE OR REPLACE FUNCTION increment_raised_amount(p_id UUID, p_amount NUMERIC)
 RETURNS void
 LANGUAGE sql
 SECURITY DEFINER
 AS $$
     UPDATE projects
-    SET    funded_amount = funded_amount + amount
-    WHERE  id = project_id;
+    SET    raised_amount = raised_amount + p_amount
+    WHERE  id = p_id;
 $$;
 
 
 -- ─────────────────────────────────────────────────────────────────────────────
--- POSTGRES VIEW: project_summary
---
--- Convenient read-only view for the projects list page.
--- Includes milestone count and vote totals in one query.
+-- FUNCTION: approve_milestone
+-- Sets approved = true and optionally marks project completed
+-- if all milestones are approved
+-- ─────────────────────────────────────────────────────────────────────────────
+CREATE OR REPLACE FUNCTION approve_milestone(m_id UUID)
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+    v_project_id   UUID;
+    v_total        INT;
+    v_approved     INT;
+BEGIN
+    -- Mark this milestone approved
+    UPDATE milestones SET approved = true WHERE id = m_id
+    RETURNING project_id INTO v_project_id;
+
+    -- Count totals for the project
+    SELECT COUNT(*),
+           COUNT(*) FILTER (WHERE approved = true)
+    INTO   v_total, v_approved
+    FROM   milestones
+    WHERE  project_id = v_project_id;
+
+    -- If all milestones approved → mark project completed
+    IF v_total > 0 AND v_total = v_approved THEN
+        UPDATE projects SET status = 'completed' WHERE id = v_project_id;
+    END IF;
+END;
+$$;
+
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- VIEW: project_summary
+-- Aggregated view used for the Projects list page
 -- ─────────────────────────────────────────────────────────────────────────────
 CREATE OR REPLACE VIEW project_summary AS
 SELECT
     p.id,
     p.title,
     p.description,
-    p.funding_target,
-    p.funded_amount,
+    p.goal_amount,
+    p.raised_amount,
+    p.owner_wallet,
     p.status,
     p.created_at,
-    u.wallet_address                          AS creator_wallet,
-    COUNT(DISTINCT m.id)                      AS milestone_count,
-    COUNT(DISTINCT m.id) FILTER (WHERE m.status = 'approved')  AS approved_milestones,
-    COUNT(DISTINCT m.id) FILTER (WHERE m.status = 'released')  AS released_milestones,
-    COUNT(DISTINCT t.id)                      AS transaction_count,
-    COALESCE(SUM(t.amount) FILTER (WHERE t.type = 'funding'), 0) AS total_funded_onchain
+    ROUND((p.raised_amount / NULLIF(p.goal_amount, 0)) * 100, 2)  AS funded_percent,
+    COUNT(DISTINCT m.id)                                            AS milestone_count,
+    COUNT(DISTINCT m.id) FILTER (WHERE m.approved = true)          AS approved_milestones,
+    COUNT(DISTINCT t.id)                                            AS total_transactions,
+    COALESCE(SUM(DISTINCT t.amount) FILTER (WHERE t.type = 'funding'), 0) AS total_funded_onchain,
+    COUNT(DISTINCT v.wallet_address)                                AS unique_voters
 FROM       projects     p
-JOIN       users        u ON u.id = p.creator_id
 LEFT JOIN  milestones   m ON m.project_id = p.id
 LEFT JOIN  transactions t ON t.project_id = p.id
-GROUP BY   p.id, u.wallet_address;
+LEFT JOIN  votes        v ON v.milestone_id = m.id
+GROUP BY   p.id;
+
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- VIEW: milestone_vote_summary
+-- Per-milestone YES/NO tally with approval status
+-- ─────────────────────────────────────────────────────────────────────────────
+CREATE OR REPLACE VIEW milestone_vote_summary AS
+SELECT
+    m.id                                                                      AS milestone_id,
+    m.project_id,
+    m.title,
+    m.amount,
+    m.approved,
+    COUNT(v.id)                                                               AS total_votes,
+    COALESCE(SUM(v.token_amount) FILTER (WHERE v.vote = true),  0)            AS yes_tokens,
+    COALESCE(SUM(v.token_amount) FILTER (WHERE v.vote = false), 0)            AS no_tokens,
+    COALESCE(SUM(v.token_amount), 0)                                          AS total_tokens,
+    ROUND(
+        COALESCE(SUM(v.token_amount) FILTER (WHERE v.vote = true), 0)
+        / NULLIF(SUM(v.token_amount), 0) * 100
+    , 2)                                                                       AS yes_percent
+FROM      milestones m
+LEFT JOIN votes      v ON v.milestone_id = m.id
+GROUP BY  m.id;
+
+
+-- ═══════════════════════════════════════════════════════════════════════════════
+-- ✅ DONE — Tables, indexes, RLS, functions, and views are ready.
+-- ═══════════════════════════════════════════════════════════════════════════════
