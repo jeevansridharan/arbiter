@@ -54,7 +54,7 @@ function statusStyle(status) {
 
 // ─────────────────────────────────────────────────────────────────────────────
 
-export default function ProjectCard({ project }) {
+export default function ProjectCard({ project, onView }) {
     const {
         title,
         description,
@@ -212,6 +212,7 @@ export default function ProjectCard({ project }) {
                     e.currentTarget.style.background = 'rgba(124,58,237,0.08)'
                     e.currentTarget.style.borderColor = 'rgba(124,58,237,0.2)'
                 }}
+                onClick={() => onView && onView(project)}
             >
                 View Project <ArrowRight size={14} />
             </button>

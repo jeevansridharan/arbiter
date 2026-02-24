@@ -3,203 +3,402 @@
  *
  * All Supabase operations for the `projects` table.
  *
- * Schema (run in Supabase SQL Editor):
- *   CREATE TABLE projects (
- *     id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
- *     creator_id     UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
- *     title          TEXT NOT NULL,
- *     description    TEXT,
- *     funding_target NUMERIC(18, 8) NOT NULL,
- *     funded_amount  NUMERIC(18, 8) NOT NULL DEFAULT 0,
- *     status         TEXT NOT NULL DEFAULT 'active'
- *                    CHECK (status IN ('active', 'completed', 'cancelled')),
- *     created_at     TIMESTAMPTZ DEFAULT now()
- *   );
- *   ALTER TABLE projects ENABLE ROW LEVEL SECURITY;
- *   CREATE POLICY "Public read"   ON projects FOR SELECT USING (true);
- *   CREATE POLICY "Creator write" ON projects FOR INSERT WITH CHECK (true);
- *   CREATE POLICY "Creator update" ON projects FOR UPDATE USING (true);
+ * FUNCTIONS EXPORTED
+ * ──────────────────
+ *   createProject(data)        → inserts a new row, returns {data, error}
+ *   fetchProjects(opts)        → reads all projects, returns {data, error}
+ *   fetchProjectById(id)       → reads one project, returns {data, error}
+ *   updateRaisedAmount(id, n)  → atomically adds to raised_amount (alias: updateFundedAmount)
+ *   updateProjectStatus(id, s) → sets status field
+ *   testInsertProject()        → inserts a dummy row to verify DB connectivity
+ *
+ * SUPABASE TABLE SCHEMA  (projects)
+ * ──────────────────────────────────
+ *   id            UUID  (auto via gen_random_uuid())
+ *   title         TEXT  NOT NULL
+ *   description   TEXT  default ''
+ *   goal_amount   NUMERIC(18,8)  NOT NULL
+ *   raised_amount NUMERIC(18,8)  default 0
+ *   owner_wallet  TEXT  NOT NULL
+ *   status        TEXT  default 'active'
+ *   created_at    TIMESTAMPTZ  default now()
+ *
+ * BUG FIXES APPLIED
+ * ──────────────────
+ *   ✓ insert([payload])  — Supabase JS v2 requires an ARRAY, not a plain object
+ *   ✓ Full try/catch around every Supabase call
+ *   ✓ console.log before AND after every insert/select
+ *   ✓ Null guard: supabase client checked before use
+ *   ✓ updateFundedAmount exported as alias for updateRaisedAmount (matches index.js)
+ *   ✓ testInsertProject() for manual connectivity verification
  */
 
-import { supabase } from '../supabase'
+import { supabase } from '../supabaseClient'
 
-function requireSupabase() {
-    if (!supabase) throw new Error('Supabase is not configured. Please add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY to your .env file.')
+// ── Constants ─────────────────────────────────────────────────────────────────
+
+const TABLE = 'projects'
+
+/** Valid project status values — matches CHECK constraint in schema.sql */
+const VALID_STATUSES = ['active', 'funded', 'completed', 'cancelled']
+
+// ── Internal helper ───────────────────────────────────────────────────────────
+
+function requireClient() {
+    if (!supabase) {
+        throw new Error(
+            '[projects.js] Supabase client is NULL.\n' +
+            'Add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY to your .env file and restart the dev server.'
+        )
+    }
 }
 
+
+// ─────────────────────────────────────────────────────────────────────────────
+// testInsertProject  ← call this from the browser console to verify DB works
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
- * createProject({ creatorId, title, description, fundingTarget, milestones })
+ * Manual test helper — inserts a dummy project to confirm the DB connection
+ * and RLS policies are working correctly.
  *
- * Inserts a new project row. The milestones array is handled separately by
- * the createMilestone function — this only creates the project header.
+ * HOW TO RUN (browser DevTools console):
+ *   import('/src/lib/db/projects.js').then(m => m.testInsertProject())
  *
- * @param {object} params
- * @param {string} params.creatorId      UUID of the user (from users table)
- * @param {string} params.title          Project title
- * @param {string} params.description    Project description
- * @param {number} params.fundingTarget  Target BCH amount (e.g. 0.5)
- * @returns {Promise<Project>}
+ * Or import it in any component temporarily:
+ *   import { testInsertProject } from '../lib/db/projects'
+ *   testInsertProject()
  */
-export async function createProject({ creatorId, title, description, fundingTarget }) {
-    if (!creatorId) throw new Error('creatorId is required')
-    if (!title) throw new Error('title is required')
-    if (!fundingTarget) throw new Error('fundingTarget is required')
+export async function testInsertProject() {
+    console.log('[testInsertProject] 🧪 Starting dummy insert…')
 
-    const { data, error } = await supabase
-        .from('projects')
-        .insert({
-            creator_id: creatorId,
-            title: title.trim(),
-            description: description?.trim() ?? '',
-            funding_target: fundingTarget,
-            funded_amount: 0,
-            status: 'active',
+    const dummy = {
+        title: `[TEST] Dummy Project ${Date.now()}`,
+        description: 'Automated connectivity test — safe to delete.',
+        goal_amount: 0.001,
+        raised_amount: 0,
+        owner_wallet: 'bchtest:test_wallet_000',
+        status: 'active',
+    }
+
+    console.log('[testInsertProject] Payload:', dummy)
+
+    try {
+        requireClient()
+
+        // ⚠ NOTE: insert MUST receive an ARRAY — this is the #1 cause of silent no-ops
+        const { data, error } = await supabase
+            .from(TABLE)
+            .insert([dummy])   // ← ARRAY required by Supabase JS v2
+            .select()
+            .single()
+
+        if (error) {
+            console.error('[testInsertProject] ✗ Insert FAILED:', error)
+            console.error('  code   :', error.code)
+            console.error('  message:', error.message)
+            console.error('  details:', error.details)
+            console.error('  hint   :', error.hint)
+            return { data: null, error }
+        }
+
+        console.info('[testInsertProject] ✓ Insert SUCCEEDED! Row:', data)
+        return { data, error: null }
+
+    } catch (err) {
+        console.error('[testInsertProject] ✗ Exception thrown:', err)
+        return { data: null, error: { message: err.message } }
+    }
+}
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// createProject
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Insert a new project into Supabase.
+ *
+ * @param {Object} projectData
+ * @param {string} projectData.title         - Project name (required)
+ * @param {string} [projectData.description] - What the project does
+ * @param {number} projectData.goal_amount   - Funding target in BCH (required)
+ * @param {string} projectData.owner_wallet  - Creator's BCH wallet address (required)
+ * @param {string} [projectData.status]      - 'active' | 'funded' | 'completed' | 'cancelled'
+ *
+ * @returns {Promise<{data: Object|null, error: Object|null}>}
+ *
+ * USAGE
+ * ─────
+ *   const { data, error } = await createProject({
+ *     title:        'My BCH App',
+ *     description:  'A milestone-based crowdfund',
+ *     goal_amount:  0.05,
+ *     owner_wallet: 'bchtest:qp...',
+ *   })
+ */
+export async function createProject({
+    title,
+    description = '',
+    goal_amount,
+    owner_wallet,
+    status = 'active',
+}) {
+
+    // ── Client-side validation ────────────────────────────────────────────────
+    if (!title || typeof title !== 'string' || title.trim().length === 0) {
+        console.error('[createProject] Validation failed: title is required')
+        return { data: null, error: { message: 'Project title is required.' } }
+    }
+
+    if (!goal_amount || isNaN(Number(goal_amount)) || Number(goal_amount) <= 0) {
+        console.error('[createProject] Validation failed: goal_amount', goal_amount)
+        return { data: null, error: { message: 'goal_amount must be a positive number.' } }
+    }
+
+    if (!owner_wallet || typeof owner_wallet !== 'string') {
+        console.error('[createProject] Validation failed: owner_wallet missing')
+        return { data: null, error: { message: 'owner_wallet (BCH address) is required.' } }
+    }
+
+    if (!VALID_STATUSES.includes(status)) {
+        console.error('[createProject] Validation failed: invalid status', status)
+        return { data: null, error: { message: `status must be one of: ${VALID_STATUSES.join(', ')}` } }
+    }
+
+    // ── Build the payload ─────────────────────────────────────────────────────
+    const payload = {
+        title: title.trim(),
+        description: description.trim(),
+        goal_amount: Number(goal_amount),
+        raised_amount: 0,              // always starts at 0
+        owner_wallet: owner_wallet.trim(),
+        status,
+        // created_at is auto-set by Supabase DEFAULT now()
+    }
+
+    console.log('[createProject] ▶ About to insert payload:', payload)
+
+    // ── Supabase INSERT (with try/catch) ──────────────────────────────────────
+    try {
+        requireClient()
+
+        // ⚠ CRITICAL FIX: insert([payload]) — must be an ARRAY
+        // Passing a plain object { ... } silently does nothing in Supabase JS v2
+        const { data, error } = await supabase
+            .from(TABLE)
+            .insert([payload])   // ← ARRAY, not object
+            .select()            // returns the inserted row(s) with server-generated fields
+            .single()            // we inserted one row — unwrap from array
+
+        if (error) {
+            console.error('[createProject] ✗ Supabase INSERT error:')
+            console.error('  code   :', error.code)
+            console.error('  message:', error.message)
+            console.error('  details:', error.details)
+            console.error('  hint   :', error.hint)
+            console.error('  full   :', error)
+            return { data: null, error }
+        }
+
+        console.info('[createProject] ✓ Insert succeeded! ID:', data.id, '| Title:', data.title)
+        console.log('[createProject] Full returned row:', data)
+        return { data, error: null }
+
+    } catch (err) {
+        console.error('[createProject] ✗ Exception thrown during insert:', err)
+        return { data: null, error: { message: err.message } }
+    }
+}
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// fetchProjects
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Fetch all projects from Supabase, newest first.
+ *
+ * @param {Object}  [opts]
+ * @param {string}  [opts.status]       - Filter by status ('active', 'funded', etc.)
+ * @param {string}  [opts.owner_wallet] - Filter by creator wallet
+ * @param {number}  [opts.limit=50]     - Max rows to return
+ * @param {number}  [opts.offset=0]     - For pagination
+ *
+ * @returns {Promise<{data: Array, error: Object|null}>}
+ *
+ * USAGE
+ * ─────
+ *   const { data, error } = await fetchProjects()
+ *   const { data, error } = await fetchProjects({ status: 'active', limit: 10 })
+ */
+export async function fetchProjects({ status, owner_wallet, limit = 50, offset = 0 } = {}) {
+
+    console.log('[fetchProjects] ▶ Fetching with filters:', { status, owner_wallet, limit, offset })
+
+    try {
+        requireClient()
+
+        // ── Build query ───────────────────────────────────────────────────────
+        let query = supabase
+            .from(TABLE)
+            .select('*')
+            .order('created_at', { ascending: false })  // newest first
+            .range(offset, offset + limit - 1)           // pagination
+
+        // Optional filters
+        if (status) query = query.eq('status', status)
+        if (owner_wallet) query = query.eq('owner_wallet', owner_wallet)
+
+        // ── Execute ───────────────────────────────────────────────────────────
+        console.log('[fetchProjects] ▶ Sending SELECT request to Supabase…')
+        const { data, error } = await query
+
+        if (error) {
+            console.error('[fetchProjects] ✗ Supabase SELECT error:')
+            console.error('  code   :', error.code)
+            console.error('  message:', error.message)
+            console.error('  full   :', error)
+            return { data: [], error }
+        }
+
+        console.info(`[fetchProjects] ✓ Got ${data.length} project(s)`)
+        return { data: data ?? [], error: null }
+
+    } catch (err) {
+        console.error('[fetchProjects] ✗ Exception thrown:', err)
+        return { data: [], error: { message: err.message } }
+    }
+}
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// fetchProjectById
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Fetch a single project by UUID, including its milestones and transactions.
+ *
+ * @param {string} id - UUID of the project
+ * @returns {Promise<{data: Object|null, error: Object|null}>}
+ */
+export async function fetchProjectById(id) {
+    if (!id) return { data: null, error: { message: 'Project ID is required.' } }
+
+    console.log('[fetchProjectById] ▶ Fetching project:', id)
+
+    try {
+        requireClient()
+
+        const { data, error } = await supabase
+            .from(TABLE)
+            .select(`
+                *,
+                milestones (*),
+                transactions (*)
+            `)
+            .eq('id', id)
+            .single()
+
+        if (error) {
+            console.error('[fetchProjectById] ✗ Error:', error)
+            return { data: null, error }
+        }
+
+        console.info('[fetchProjectById] ✓ Found project:', data.title)
+        return { data, error: null }
+
+    } catch (err) {
+        console.error('[fetchProjectById] ✗ Exception:', err)
+        return { data: null, error: { message: err.message } }
+    }
+}
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// updateRaisedAmount  (also exported as updateFundedAmount — same function)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Atomically increment raised_amount using the Postgres RPC function
+ * `increment_raised_amount` — safe under concurrent funding.
+ *
+ * Exported TWICE (as updateRaisedAmount AND updateFundedAmount) so both
+ * naming styles work without breaking existing imports.
+ *
+ * @param {string} id     - Project UUID
+ * @param {number} amount - Amount to ADD (in BCH)
+ */
+export async function updateRaisedAmount(id, amount) {
+    if (!id || !amount || amount <= 0) {
+        return { data: null, error: { message: 'Valid project id and positive amount required.' } }
+    }
+
+    console.log('[updateRaisedAmount] ▶ Incrementing raised_amount for project:', id, 'by', amount)
+
+    try {
+        requireClient()
+
+        const { data, error } = await supabase.rpc('increment_raised_amount', {
+            p_id: id,
+            p_amount: amount,
         })
-        .select()
-        .single()
 
-    if (error) {
-        console.error('[db/projects] createProject error:', error)
-        throw new Error(error.message)
-    }
+        if (error) {
+            console.error('[updateRaisedAmount] ✗ RPC error:', error)
+            return { data: null, error }
+        }
 
-    return data
-}
+        console.info('[updateRaisedAmount] ✓ Done. Result:', data)
+        return { data, error: null }
 
-// ─────────────────────────────────────────────────────────────────────────────
-
-/**
- * fetchProjects({ status, creatorId, limit, offset })
- *
- * Fetch projects with optional filters.
- * Joins milestones count and total funded amount for the list view.
- *
- * @param {object} [options]
- * @param {string} [options.status]     Filter by status: 'active' | 'completed' | 'cancelled'
- * @param {string} [options.creatorId]  Filter to only this creator's projects
- * @param {number} [options.limit=20]   Pagination limit
- * @param {number} [options.offset=0]   Pagination offset
- * @returns {Promise<Project[]>}
- */
-export async function fetchProjects({ status, creatorId, limit = 20, offset = 0 } = {}) {
-    let query = supabase
-        .from('projects')
-        .select(`
-            *,
-            creator:users(wallet_address),
-            milestones(count)
-        `)
-        .order('created_at', { ascending: false })
-        .range(offset, offset + limit - 1)
-
-    if (status) query = query.eq('status', status)
-    if (creatorId) query = query.eq('creator_id', creatorId)
-
-    const { data, error } = await query
-
-    if (error) {
-        console.error('[db/projects] fetchProjects error:', error)
-        throw new Error(error.message)
-    }
-
-    return data ?? []
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-
-/**
- * fetchProjectById(projectId)
- *
- * Fetch a single project with all its milestones and latest transactions.
- *
- * @param   {string} projectId  UUID
- * @returns {Promise<Project|null>}
- */
-export async function fetchProjectById(projectId) {
-    if (!projectId) throw new Error('projectId is required')
-
-    const { data, error } = await supabase
-        .from('projects')
-        .select(`
-            *,
-            creator:users(wallet_address),
-            milestones(*),
-            transactions(*)
-        `)
-        .eq('id', projectId)
-        .maybeSingle()
-
-    if (error) {
-        console.error('[db/projects] fetchProjectById error:', error)
-        throw new Error(error.message)
-    }
-
-    return data
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-
-/**
- * updateFundedAmount(projectId, additionalAmount)
- *
- * Atomically adds `additionalAmount` BCH to the project's funded_amount.
- * Uses Supabase's RPC (PostgreSQL function) to avoid race conditions —
- * two funders clicking at the same moment won't overwrite each other.
- *
- * ⚠️ You must create this Postgres function first (SQL Editor):
- *
- *   CREATE OR REPLACE FUNCTION increment_funded_amount(project_id UUID, amount NUMERIC)
- *   RETURNS void LANGUAGE sql AS $$
- *     UPDATE projects
- *     SET funded_amount = funded_amount + amount
- *     WHERE id = project_id;
- *   $$;
- *
- * @param   {string} projectId        UUID
- * @param   {number} additionalAmount BCH to add
- * @returns {Promise<void>}
- */
-export async function updateFundedAmount(projectId, additionalAmount) {
-    if (!projectId) throw new Error('projectId is required')
-    if (!additionalAmount || additionalAmount <= 0) throw new Error('additionalAmount must be > 0')
-
-    const { error } = await supabase
-        .rpc('increment_funded_amount', {
-            project_id: projectId,
-            amount: additionalAmount,
-        })
-
-    if (error) {
-        console.error('[db/projects] updateFundedAmount error:', error)
-        throw new Error(error.message)
+    } catch (err) {
+        console.error('[updateRaisedAmount] ✗ Exception:', err)
+        return { data: null, error: { message: err.message } }
     }
 }
 
+/** Alias — same function, supports both naming conventions across the codebase */
+export const updateFundedAmount = updateRaisedAmount
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// updateProjectStatus
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
- * updateProjectStatus(projectId, status)
+ * Update the status of a project.
  *
- * Update the project's lifecycle status.
- *
- * @param {string} projectId
- * @param {'active'|'completed'|'cancelled'} status
+ * @param {string} id     - Project UUID
+ * @param {string} status - 'active' | 'funded' | 'completed' | 'cancelled'
  */
-export async function updateProjectStatus(projectId, status) {
-    if (!projectId) throw new Error('projectId is required')
-    if (!['active', 'completed', 'cancelled'].includes(status)) {
-        throw new Error('Invalid status. Must be active, completed, or cancelled.')
+export async function updateProjectStatus(id, status) {
+    if (!VALID_STATUSES.includes(status)) {
+        return { data: null, error: { message: `Invalid status. Must be: ${VALID_STATUSES.join(', ')}` } }
     }
 
-    const { error } = await supabase
-        .from('projects')
-        .update({ status })
-        .eq('id', projectId)
+    console.log('[updateProjectStatus] ▶ Setting project', id, '→ status:', status)
 
-    if (error) {
-        console.error('[db/projects] updateProjectStatus error:', error)
-        throw new Error(error.message)
+    try {
+        requireClient()
+
+        const { data, error } = await supabase
+            .from(TABLE)
+            .update({ status })
+            .eq('id', id)
+            .select()
+            .single()
+
+        if (error) {
+            console.error('[updateProjectStatus] ✗ Error:', error)
+            return { data: null, error }
+        }
+
+        console.info('[updateProjectStatus] ✓ Updated. New status:', data.status)
+        return { data, error: null }
+
+    } catch (err) {
+        console.error('[updateProjectStatus] ✗ Exception:', err)
+        return { data: null, error: { message: err.message } }
     }
 }

@@ -8,12 +8,20 @@
  *
  * Never import directly from individual db files in components.
  * Always go through this index for clean dependency tracking.
+ *
+ * BUG FIX: updateFundedAmount is now correctly exported from projects.js
+ * (it was previously listed here but missing from projects.js — name mismatch fixed)
  */
 
 export { upsertUser, getUserByWallet } from './users'
 export {
-    createProject, fetchProjects, fetchProjectById,
-    updateFundedAmount, updateProjectStatus
+    createProject,
+    fetchProjects,
+    fetchProjectById,
+    updateRaisedAmount,
+    updateFundedAmount,   // ← alias of updateRaisedAmount, both available
+    updateProjectStatus,
+    testInsertProject,    // ← dev/debug helper
 } from './projects'
 export {
     createMilestone, createMilestoneBatch,

@@ -36,10 +36,16 @@ import {
     AlertCircle, Inbox,
 } from 'lucide-react'
 
-import { supabase } from '../lib/supabase'
+import { supabase } from '../lib/supabaseClient'
+import { createProject } from '../lib/db/projects'
 import ProjectCard from '../components/ProjectCard'
 import ProjectForm from '../components/ProjectForm'
 import Dashboard from '../components/Dashboard'
+
+// ── TODO: Replace with the currently connected wallet address ─────────────────
+// If you have a wallet context/hook, import it here and pass the address down.
+// For now we use a placeholder so the owner_wallet field is never empty.
+const PLACEHOLDER_WALLET = 'bchtest:not_connected_yet'
 
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -106,12 +112,49 @@ export default function ProjectsPage() {
 
     // ── Handlers ──────────────────────────────────────────────────────────────
 
-    /** Called by ProjectForm when the user submits a new project */
-    const handleProjectCreate = (projectData) => {
-        setActiveProject({ ...projectData, raised_amount: 0 })
+    /**
+     * handleProjectCreate
+     *
+     * Called by ProjectForm when the user submits the form.
+     *
+     * BUG FIX: was NOT async, never actually called Supabase.
+     * Now: awaits createProject(), throws on error (form shows it),
+     * sets local state only AFTER a confirmed DB insert.
+     *
+     * @param {object} projectData — from ProjectForm (goal_amount, owner_wallet, etc.)
+     */
+    const handleProjectCreate = async (projectData) => {
+        console.log('[ProjectsPage] handleProjectCreate: received formData =', projectData)
+        console.log('[ProjectsPage] handleProjectCreate: calling Supabase insert…')
+
+        // ── Real Supabase INSERT ──────────────────────────────────────────────
+        const { data: newProject, error: insertError } = await createProject({
+            title: projectData.title,
+            description: projectData.description ?? '',
+            goal_amount: projectData.goal_amount,
+            owner_wallet: projectData.owner_wallet ?? PLACEHOLDER_WALLET,
+            status: 'active',
+        })
+
+        if (insertError) {
+            console.error('[ProjectsPage] handleProjectCreate: INSERT FAILED:', insertError)
+            // Throw so ProjectForm catches it and shows the error to the user
+            throw new Error(insertError.message ?? 'Supabase insert failed')
+        }
+
+        console.log('[ProjectsPage] handleProjectCreate: ✓ project inserted:', newProject)
+
+        // ── Update UI after confirmed insert ──────────────────────────────────
+        const fullProject = {
+            ...newProject,
+            milestones: projectData.milestones ?? [],
+            raised_amount: 0,
+        }
+
+        // Prepend to list so it appears immediately (optimistic UI)
+        setProjects(prev => [fullProject, ...prev])
+        setActiveProject(fullProject)
         setShowForm(false)
-        // Re-fetch to include the new project in the list
-        fetchProjects()
     }
 
     const handleFund = (amount) =>
@@ -161,7 +204,10 @@ export default function ProjectsPage() {
                 >
                     ← Back to Projects
                 </button>
-                <ProjectForm onProjectCreate={handleProjectCreate} />
+                <ProjectForm
+                    onProjectCreate={handleProjectCreate}
+                    walletAddress={PLACEHOLDER_WALLET}
+                />
             </div>
         )
     }
@@ -325,7 +371,11 @@ export default function ProjectsPage() {
                         gap: '20px',
                     }}>
                         {projects.map(project => (
-                            <ProjectCard key={project.id} project={project} />
+                            <ProjectCard
+                                key={project.id}
+                                project={project}
+                                onView={(p) => setActiveProject(p)}
+                            />
                         ))}
                     </div>
                 </>

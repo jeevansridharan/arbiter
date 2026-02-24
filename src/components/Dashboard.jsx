@@ -5,7 +5,15 @@ import WalletPanel from './WalletPanel'
 import GovernancePanel from './GovernancePanel'
 
 export default function Dashboard({ project, onFund, onVote, onReset }) {
-    const { title, description, fundingTarget, fundedAmount, milestones } = project
+    // Support both old ProjectForm shape and new Supabase schema shape
+    const title = project.title ?? 'Untitled Project'
+    const description = project.description ?? ''
+    // fundingTarget (old) OR goal_amount (Supabase)
+    const fundingTarget = parseFloat(project.fundingTarget ?? project.goal_amount ?? 0)
+    // fundedAmount (old)  OR raised_amount (Supabase)
+    const fundedAmount = parseFloat(project.fundedAmount ?? project.raised_amount ?? 0)
+    // milestones may not exist for Supabase-fetched projects yet
+    const milestones = Array.isArray(project.milestones) ? project.milestones : []
     const approvedCount = milestones.filter(m => m.status === 'Approved').length
 
     // ── Week 3: track the connected wallet object so GovernancePanel can use it

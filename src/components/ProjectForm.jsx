@@ -1,12 +1,30 @@
+/**
+ * src/components/ProjectForm.jsx
+ *
+ * Project creation form.
+ *
+ * BUG FIXES APPLIED
+ * ──────────────────
+ *   ✓ handleSubmit is now async so it can await the DB insert
+ *   ✓ Calls onProjectCreate with await and catches any thrown errors
+ *   ✓ Shows a submitting spinner while the DB call is in flight
+ *   ✓ Shows a submission error message if the insert fails
+ *   ✓ Passes goal_amount (not fundingTarget) to match DB column name
+ *   ✓ owner_wallet is passed via prop (wallet address from parent)
+ */
+
 import React, { useState } from 'react'
 
-export default function ProjectForm({ onProjectCreate }) {
+export default function ProjectForm({ onProjectCreate, walletAddress }) {
     const [title, setTitle] = useState('')
     const [description, setDescription] = useState('')
     const [fundingTarget, setFundingTarget] = useState('')
     const [milestoneInput, setMilestoneInput] = useState('')
     const [milestones, setMilestones] = useState([])
     const [errors, setErrors] = useState({})
+    const [submitting, setSubmitting] = useState(false)
+    const [submitError, setSubmitError] = useState(null)
+    const [submitSuccess, setSubmitSuccess] = useState(false)
 
     const addMilestone = () => {
         const trimmed = milestoneInput.trim()
@@ -35,25 +53,48 @@ export default function ProjectForm({ onProjectCreate }) {
         return newErrors
     }
 
-    const handleSubmit = (e) => {
+    // ── FIXED: async handler so we can await the Supabase insert ─────────────
+    const handleSubmit = async (e) => {
         e.preventDefault()
+
         const validationErrors = validate()
         if (Object.keys(validationErrors).length > 0) {
             setErrors(validationErrors)
             return
         }
+
         setErrors({})
-        onProjectCreate({
+        setSubmitError(null)
+        setSubmitSuccess(false)
+        setSubmitting(true)
+
+        const projectData = {
             title: title.trim(),
             description: description.trim(),
-            fundingTarget: Number(fundingTarget),
+            goal_amount: Number(fundingTarget),       // ← DB column name
+            owner_wallet: walletAddress ?? 'bchtest:unknown',  // ← DB column name
             milestones: milestones.map((m, i) => ({
                 id: i,
                 title: m,
-                status: 'Pending',
+                description: '',
+                status: 'pending',
                 votes: { yes: 0, no: 0 },
             })),
-        })
+        }
+
+        console.log('[ProjectForm] handleSubmit: submitting projectData =', projectData)
+
+        try {
+            // onProjectCreate must be async (defined in ProjectsPage)
+            await onProjectCreate(projectData)
+            setSubmitSuccess(true)
+            console.log('[ProjectForm] handleSubmit: ✓ success')
+        } catch (err) {
+            console.error('[ProjectForm] handleSubmit: ✗ error from onProjectCreate:', err)
+            setSubmitError(err.message ?? 'Failed to create project. Check the console for details.')
+        } finally {
+            setSubmitting(false)
+        }
     }
 
     return (
@@ -69,6 +110,29 @@ export default function ProjectForm({ onProjectCreate }) {
             </div>
 
             <form onSubmit={handleSubmit} className="card-glass rounded-2xl p-8 space-y-6">
+
+                {/* ── Global submit error ──────────────────────────────────── */}
+                {submitError && (
+                    <div style={{
+                        background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.25)',
+                        borderRadius: '12px', padding: '14px 18px',
+                        color: '#f87171', fontSize: '0.85rem', fontWeight: 500,
+                    }}>
+                        ✗ {submitError}
+                    </div>
+                )}
+
+                {/* ── Success banner ───────────────────────────────────────── */}
+                {submitSuccess && (
+                    <div style={{
+                        background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.25)',
+                        borderRadius: '12px', padding: '14px 18px',
+                        color: '#34d399', fontSize: '0.85rem', fontWeight: 500,
+                    }}>
+                        ✓ Project created and saved to Supabase!
+                    </div>
+                )}
+
                 {/* Project Title */}
                 <div>
                     <label className="block text-sm font-semibold text-slate-300 mb-2">
@@ -181,10 +245,13 @@ export default function ProjectForm({ onProjectCreate }) {
                 <button
                     type="submit"
                     id="create-project-btn"
+                    disabled={submitting}
                     className="w-full py-3.5 rounded-xl font-bold text-white gradient-btn text-base mt-2"
+                    style={{ opacity: submitting ? 0.7 : 1, cursor: submitting ? 'not-allowed' : 'pointer' }}
                 >
-                    🚀 Create Project
+                    {submitting ? '⏳ Saving to Supabase…' : '🚀 Create Project'}
                 </button>
+
             </form>
         </div>
     )
