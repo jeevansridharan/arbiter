@@ -142,7 +142,7 @@ export default function TransactionsPage() {
 
                 {!loading && !error && txs.length === 0 && (
                     <div style={{ padding: '60px', textAlign: 'center' }}>
-                        <ArrowLeftRight size={36} color="#1e293b" style={{ margin: '0 auto 16px', display: 'block' }} />
+                        <ArrowUpRight size={36} color="#1e293b" style={{ margin: '0 auto 16px', display: 'block' }} />
                         <p style={{ color: '#334155', fontWeight: 600, fontSize: '0.9rem' }}>No transactions yet</p>
                         <p style={{ color: '#1e293b', fontSize: '0.8rem', marginTop: '4px' }}>Fund a project on the Projects page to see activity here</p>
                     </div>

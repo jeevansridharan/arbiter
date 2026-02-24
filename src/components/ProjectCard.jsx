@@ -6,7 +6,7 @@
  */
 
 import React from 'react'
-import { Calendar, Target, TrendingUp, Wallet, ArrowRight } from 'lucide-react'
+import { Calendar, Target, TrendingUp, Wallet, ArrowRight, Trash2 } from 'lucide-react'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -54,7 +54,7 @@ function statusStyle(status) {
 
 // ─────────────────────────────────────────────────────────────────────────────
 
-export default function ProjectCard({ project, onView }) {
+export default function ProjectCard({ project, onView, onDelete }) {
     const {
         title,
         description,
@@ -185,37 +185,75 @@ export default function ProjectCard({ project, onView }) {
                 </div>
             </div>
 
-            {/* ── View button ── */}
-            <button
-                style={{
-                    marginTop: '4px',
-                    width: '100%',
-                    padding: '10px',
-                    borderRadius: '10px',
-                    background: 'rgba(124,58,237,0.08)',
-                    border: '1px solid rgba(124,58,237,0.2)',
-                    color: '#a78bfa',
-                    fontWeight: 700,
-                    fontSize: '0.82rem',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: '6px',
-                    transition: 'all 0.2s ease',
-                }}
-                onMouseEnter={e => {
-                    e.currentTarget.style.background = 'rgba(124,58,237,0.15)'
-                    e.currentTarget.style.borderColor = 'rgba(124,58,237,0.4)'
-                }}
-                onMouseLeave={e => {
-                    e.currentTarget.style.background = 'rgba(124,58,237,0.08)'
-                    e.currentTarget.style.borderColor = 'rgba(124,58,237,0.2)'
-                }}
-                onClick={() => onView && onView(project)}
-            >
-                View Project <ArrowRight size={14} />
-            </button>
+            {/* ── Action buttons row ── */}
+            <div style={{ display: 'flex', gap: '8px', marginTop: '4px' }}>
+
+                {/* View button */}
+                <button
+                    style={{
+                        flex: 1,
+                        padding: '10px',
+                        borderRadius: '10px',
+                        background: 'rgba(124,58,237,0.08)',
+                        border: '1px solid rgba(124,58,237,0.2)',
+                        color: '#a78bfa',
+                        fontWeight: 700,
+                        fontSize: '0.82rem',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '6px',
+                        transition: 'all 0.2s ease',
+                    }}
+                    onMouseEnter={e => {
+                        e.currentTarget.style.background = 'rgba(124,58,237,0.15)'
+                        e.currentTarget.style.borderColor = 'rgba(124,58,237,0.4)'
+                    }}
+                    onMouseLeave={e => {
+                        e.currentTarget.style.background = 'rgba(124,58,237,0.08)'
+                        e.currentTarget.style.borderColor = 'rgba(124,58,237,0.2)'
+                    }}
+                    onClick={() => onView && onView(project)}
+                >
+                    View Project <ArrowRight size={14} />
+                </button>
+
+                {/* Delete button */}
+                {onDelete && (
+                    <button
+                        title="Delete project"
+                        style={{
+                            padding: '10px 14px',
+                            borderRadius: '10px',
+                            background: 'rgba(239,68,68,0.07)',
+                            border: '1px solid rgba(239,68,68,0.2)',
+                            color: '#f87171',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            transition: 'all 0.2s ease',
+                            flexShrink: 0,
+                        }}
+                        onMouseEnter={e => {
+                            e.currentTarget.style.background = 'rgba(239,68,68,0.15)'
+                            e.currentTarget.style.borderColor = 'rgba(239,68,68,0.4)'
+                        }}
+                        onMouseLeave={e => {
+                            e.currentTarget.style.background = 'rgba(239,68,68,0.07)'
+                            e.currentTarget.style.borderColor = 'rgba(239,68,68,0.2)'
+                        }}
+                        onClick={() => {
+                            if (window.confirm(`Delete "${title}"? This cannot be undone.`)) {
+                                onDelete(project.id)
+                            }
+                        }}
+                    >
+                        <Trash2 size={15} />
+                    </button>
+                )}
+            </div>
 
         </div>
     )

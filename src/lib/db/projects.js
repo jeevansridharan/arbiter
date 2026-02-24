@@ -402,3 +402,43 @@ export async function updateProjectStatus(id, status) {
         return { data: null, error: { message: err.message } }
     }
 }
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// deleteProject
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Permanently delete a project by its UUID.
+ * The ON DELETE CASCADE on milestones / transactions / votes means all
+ * related rows are automatically removed by Postgres.
+ *
+ * @param {string} id - UUID of the project to delete
+ * @returns {Promise<{error: Object|null}>}
+ */
+export async function deleteProject(id) {
+    console.log('[deleteProject] ▶ Deleting project:', id)
+
+    try {
+        requireClient()
+
+        if (!id) throw new Error('deleteProject: id is required')
+
+        const { error } = await supabase
+            .from(TABLE)
+            .delete()
+            .eq('id', id)
+
+        if (error) {
+            console.error('[deleteProject] ✗ Supabase DELETE error:', error.message)
+            return { error }
+        }
+
+        console.info('[deleteProject] ✓ Project deleted:', id)
+        return { error: null }
+
+    } catch (err) {
+        console.error('[deleteProject] ✗ Exception:', err)
+        return { error: { message: err.message } }
+    }
+}

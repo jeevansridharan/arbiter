@@ -37,7 +37,7 @@ import {
 } from 'lucide-react'
 
 import { supabase } from '../lib/supabaseClient'
-import { createProject } from '../lib/db/projects'
+import { createProject, deleteProject } from '../lib/db/projects'
 import ProjectCard from '../components/ProjectCard'
 import ProjectForm from '../components/ProjectForm'
 import Dashboard from '../components/Dashboard'
@@ -171,6 +171,16 @@ export default function ProjectsPage() {
                 }
             ),
         }))
+
+    const handleProjectDelete = async (projectId) => {
+        const { error } = await deleteProject(projectId)
+        if (error) {
+            alert(`Failed to delete project: ${error.message}`)
+            return
+        }
+        // Remove from local state
+        setProjects(prev => prev.filter(p => p.id !== projectId))
+    }
 
     const handleReset = () => {
         setActiveProject(null)
@@ -375,6 +385,7 @@ export default function ProjectsPage() {
                                 key={project.id}
                                 project={project}
                                 onView={(p) => setActiveProject(p)}
+                                onDelete={handleProjectDelete}
                             />
                         ))}
                     </div>

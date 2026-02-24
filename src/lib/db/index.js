@@ -1,18 +1,3 @@
-/**
- * src/lib/db/index.js
- *
- * Barrel export — import everything from one place.
- *
- * Usage in components:
- *   import { createProject, voteOnMilestone, insertTransaction } from '../lib/db'
- *
- * Never import directly from individual db files in components.
- * Always go through this index for clean dependency tracking.
- *
- * BUG FIX: updateFundedAmount is now correctly exported from projects.js
- * (it was previously listed here but missing from projects.js — name mismatch fixed)
- */
-
 export { upsertUser, getUserByWallet } from './users'
 export {
     createProject,
@@ -21,6 +6,7 @@ export {
     updateRaisedAmount,
     updateFundedAmount,   // ← alias of updateRaisedAmount, both available
     updateProjectStatus,
+    deleteProject,        // ← delete a project by UUID
     testInsertProject,    // ← dev/debug helper
 } from './projects'
 export {

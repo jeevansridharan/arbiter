@@ -1,18 +1,20 @@
 /**
  * pages/DashboardPage.jsx
  * Overview stats + quick-access cards for the Milestara dashboard.
+ * Stats are live-fetched from Supabase on mount.
  */
 
-import React from 'react'
+import React, { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import {
-    FolderKanban, Vote, ArrowLeftRight,
+    FolderKanban, Vote, ArrowUpRight,
     TrendingUp, Zap, Shield, ChevronRight,
-    Bitcoin
+    Bitcoin, RefreshCw,
 } from 'lucide-react'
+import { supabase, supabaseConfigured } from '../lib/supabase'
 
 // ── Stat card ────────────────────────────────────────────────────────────────
-function StatCard({ label, value, sub, accentColor, Icon }) {
+function StatCard({ label, value, sub, accentColor, Icon, loading }) {
     return (
         <div style={{
             background: 'rgba(15,17,35,0.85)',
@@ -35,7 +37,11 @@ function StatCard({ label, value, sub, accentColor, Icon }) {
                 </div>
             </div>
             <div>
-                <p style={{ fontSize: '2rem', fontWeight: 800, color: '#f1f5f9', lineHeight: 1 }}>{value}</p>
+                {loading ? (
+                    <div style={{ width: '60px', height: '32px', borderRadius: '6px', background: 'rgba(255,255,255,0.06)', animation: 'pulse 1.5s ease-in-out infinite' }} />
+                ) : (
+                    <p style={{ fontSize: '2rem', fontWeight: 800, color: '#f1f5f9', lineHeight: 1 }}>{value}</p>
+                )}
                 <p style={{ fontSize: '0.75rem', color: accentColor, fontWeight: 600, marginTop: '4px' }}>{sub}</p>
             </div>
         </div>
@@ -75,6 +81,48 @@ function QuickAction({ to, Icon, title, description, color }) {
 
 // ─────────────────────────────────────────────────────────────────────────────
 export default function DashboardPage() {
+    const [stats, setStats] = useState({ projects: 0, bchRaised: '0.000', votes: 0 })
+    const [loading, setLoading] = useState(true)
+
+    async function loadStats() {
+        if (!supabaseConfigured || !supabase) {
+            setLoading(false)
+            return
+        }
+        setLoading(true)
+        try {
+            // Fetch all three counts in parallel
+            const [projRes, txRes, voteRes] = await Promise.all([
+                supabase.from('projects').select('raised_amount', { count: 'exact' }),
+                supabase.from('transactions').select('amount', { count: 'exact' }),
+                supabase.from('votes').select('id', { count: 'exact' }),
+            ])
+
+            // Total project count
+            const projectCount = projRes.count ?? 0
+
+            // Sum of all raised_amount across projects
+            const totalRaised = (projRes.data ?? []).reduce(
+                (sum, p) => sum + parseFloat(p.raised_amount || 0), 0
+            )
+
+            // Total votes cast
+            const voteCount = voteRes.count ?? 0
+
+            setStats({
+                projects: projectCount,
+                bchRaised: totalRaised.toFixed(3),
+                votes: voteCount,
+            })
+        } catch (e) {
+            console.error('[DashboardPage] Failed to load stats:', e.message)
+        } finally {
+            setLoading(false)
+        }
+    }
+
+    useEffect(() => { loadStats() }, [])
+
     return (
         <div>
             {/* ── Page header ──────────────────────────────────────────────── */}
@@ -87,19 +135,40 @@ export default function DashboardPage() {
                     <div style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#10b981', boxShadow: '0 0 6px rgba(16,185,129,0.8)' }} />
                     <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#10b981', letterSpacing: '0.06em' }}>LIVE · CHIPNET TESTNET</span>
                 </div>
-                <h1 style={{ fontSize: '2rem', fontWeight: 800, color: '#f1f5f9', letterSpacing: '-0.03em', marginBottom: '6px' }}>
-                    Welcome to Milestara
-                </h1>
-                <p style={{ color: '#64748b', fontSize: '0.95rem' }}>
-                    Milestone-based funding platform on Bitcoin Cash
-                </p>
+                <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
+                    <div>
+                        <h1 style={{ fontSize: '2rem', fontWeight: 800, color: '#f1f5f9', letterSpacing: '-0.03em', marginBottom: '6px' }}>
+                            Welcome to Milestara
+                        </h1>
+                        <p style={{ color: '#64748b', fontSize: '0.95rem' }}>
+                            Milestone-based funding platform on Bitcoin Cash
+                        </p>
+                    </div>
+                    {/* Refresh button */}
+                    <button
+                        onClick={loadStats}
+                        title="Refresh stats"
+                        style={{
+                            display: 'flex', alignItems: 'center', gap: '6px',
+                            padding: '8px 14px', borderRadius: '10px', cursor: 'pointer',
+                            background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)',
+                            color: '#64748b', fontSize: '0.78rem', fontWeight: 600,
+                            transition: 'all 0.2s',
+                        }}
+                        onMouseEnter={e => { e.currentTarget.style.color = '#a78bfa'; e.currentTarget.style.borderColor = 'rgba(167,139,250,0.3)' }}
+                        onMouseLeave={e => { e.currentTarget.style.color = '#64748b'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)' }}
+                    >
+                        <RefreshCw size={13} />
+                        Refresh
+                    </button>
+                </div>
             </div>
 
             {/* ── Stats grid ────────────────────────────────────────────────── */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '16px', marginBottom: '32px' }}>
-                <StatCard label="Total Projects" value="0" sub="Active on Chipnet" accentColor="#7c3aed" Icon={FolderKanban} />
-                <StatCard label="BCH Raised" value="0.000" sub="Test BCH (tBCH)" accentColor="#10b981" Icon={Bitcoin} />
-                <StatCard label="Votes Cast" value="0" sub="Governance tokens" accentColor="#06b6d4" Icon={Vote} />
+                <StatCard label="Total Projects" value={stats.projects} sub="Active on Chipnet" accentColor="#7c3aed" Icon={FolderKanban} loading={loading} />
+                <StatCard label="BCH Raised" value={stats.bchRaised} sub="Test BCH (tBCH)" accentColor="#10b981" Icon={Bitcoin} loading={loading} />
+                <StatCard label="Votes Cast" value={stats.votes} sub="Governance tokens" accentColor="#06b6d4" Icon={Vote} loading={loading} />
             </div>
 
             {/* ── Quick actions ─────────────────────────────────────────────── */}
@@ -110,7 +179,7 @@ export default function DashboardPage() {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                     <QuickAction to="/projects" Icon={FolderKanban} title="Create or Browse Projects" description="Fund a milestone-based project on Chipnet" color="#7c3aed" />
                     <QuickAction to="/governance" Icon={Vote} title="Governance Voting" description="Use GOV tokens to vote on milestones" color="#10b981" />
-                    <QuickAction to="/transactions" Icon={ArrowLeftRight} title="Transaction History" description="View all on-chain BCH transactions" color="#06b6d4" />
+                    <QuickAction to="/transactions" Icon={ArrowUpRight} title="Transaction History" description="View all on-chain BCH transactions" color="#06b6d4" />
                 </div>
             </div>
 
