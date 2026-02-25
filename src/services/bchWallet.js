@@ -22,9 +22,9 @@ const CHIPNET_ELECTRUM_WSS = 'wss://chipnet.imaginary.cash:50004'
 
 /**
  * The predefined Chipnet project wallet that RECEIVES funds.
- * Note: Should be in cashaddr format starting with 'bchtest:'
+ * Note: Generated fresh for Chipnet v3.
  */
-export const PROJECT_ADDRESS = 'bchtest:qzs8qgaupu6m6gqnrm3n3zt0p8slhgn4sy2smwwvy2'
+export const PROJECT_ADDRESS = 'bchtest:qpvjwg6g5ryqqrnjj56d0gknqmnydrxn8seudaqgp7'
 
 const WALLET_STORAGE_KEY = 'milestara_chipnet_wif'
 

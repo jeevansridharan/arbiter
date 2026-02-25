@@ -68,11 +68,14 @@ export async function fundMilestoneContract(wallet, amountBch, projectAddr) {
 
     try {
         // Send actual BCH to the project address (simulating locking)
+        // Convert BCH to satoshis (BigInt) for v3 API
+        const satoshis = BigInt(Math.round(parseFloat(amountBch) * 1e8))
+
         const result = await wallet.send([
             {
                 cashaddr: projectAddr,
-                value: parseFloat(amountBch),
-                unit: 'bch',
+                value: satoshis,
+                unit: 'sat',
             },
         ])
         mintTxId = result.txId
@@ -141,11 +144,14 @@ export async function releaseMilestoneFunds(wallet, amountBch, projectAddr) {
 
     // In a real system, the contract would hold the funds.
     // Here we send from the connected wallet to simulate release.
+    // Convert BCH to satoshis (BigInt) for v3 API
+    const satoshis = BigInt(Math.round(parseFloat(amountBch) * 1e8))
+
     const result = await wallet.send([
         {
             cashaddr: projectAddr,
-            value: parseFloat(amountBch),
-            unit: 'bch',
+            value: satoshis,
+            unit: 'sat',
         },
     ])
 
