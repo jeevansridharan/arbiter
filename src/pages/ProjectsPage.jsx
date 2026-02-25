@@ -221,6 +221,7 @@ export default function ProjectsPage() {
     const handleReset = () => {
         setActiveProject(null)
         setShowForm(false)
+        fetchProjects() // Refresh the list so totals are accurate when returning
     }
 
     // ── Route: show Dashboard if a project is active ──────────────────────────

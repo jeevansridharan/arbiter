@@ -1,35 +1,108 @@
-import React, { useState, useCallback } from 'react'
+/**
+ * Dashboard.jsx  —  Milestara Project Dashboard (Fully Database-Driven)
+ *
+ * This version uses useEffect to fetch the latest project data from Supabase,
+ * ensuring that the "Raised Amount" and "Milestones" are always accurate
+ * and persist across page navigation.
+ */
+
+import React, { useState, useEffect, useCallback } from 'react'
+import { fetchProjectById } from '../lib/db/projects'
 import ProgressBar from './ProgressBar'
 import MilestoneCard from './MilestoneCard'
 import WalletPanel from './WalletPanel'
 import GovernancePanel from './GovernancePanel'
 
-export default function Dashboard({ project, onFund, onVote, onTransaction, onReset }) {
-    // Support both old ProjectForm shape and new Supabase schema shape
-    const title = project.title ?? 'Untitled Project'
-    const description = project.description ?? ''
-    // fundingTarget (old) OR goal_amount (Supabase)
-    const fundingTarget = parseFloat(project.fundingTarget ?? project.goal_amount ?? 0)
-    // fundedAmount (old)  OR raised_amount (Supabase)
-    const fundedAmount = parseFloat(project.fundedAmount ?? project.raised_amount ?? 0)
-    // milestones may not exist for Supabase-fetched projects yet
-    const milestones = Array.isArray(project.milestones) ? project.milestones : []
-    const approvedCount = milestones.filter(m => m.status === 'Approved').length
+// ── Spinner Helper ─────────────────────────────────────────────────────────
+function LoadingSpinner() {
+    return (
+        <div className="flex flex-col items-center justify-center py-20">
+            <svg className="animate-spin h-10 w-10 text-emerald-500 mb-4" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+            </svg>
+            <p className="text-slate-400 font-medium animate-pulse">Synchronizing with blockchain...</p>
+        </div>
+    )
+}
 
-    // ── track the connected wallet object so GovernancePanel can use it
+export default function Dashboard({ project: initialProject, onFund, onVote, onTransaction, onReset }) {
+    // ── State ────────────────────────────────────────────────────────────────
+    const [project, setProject] = useState(initialProject)
+    const [loading, setLoading] = useState(true)
+    const [error, setError] = useState(null)
     const [connectedWallet, setConnectedWallet] = useState(null)
 
-    // Handle governance approval — syncs with the existing onVote system
-    const handleGovApproval = useCallback((milestoneId) => {
-        // Force the milestone to "Approved" via the parent vote handler
-        const milestone = milestones.find(m => m.id === milestoneId)
-        if (milestone && milestone.status !== 'Approved') {
-            onVote(milestoneId, 'yes')
+    // ── Fetch Logic ──────────────────────────────────────────────────────────
+
+    /**
+     * fetchProjectData()
+     * 
+     * Refetches the project from Supabase. This is the source of truth.
+     * We call this on mount and after every transaction.
+     */
+    const fetchProjectData = useCallback(async (isSilent = false) => {
+        if (!isSilent) setLoading(true)
+        console.log(`[Dashboard] 🔄 Fetching latest project data for ID: ${initialProject.id}`)
+
+        try {
+            const { data, error: fetchError } = await fetchProjectById(initialProject.id)
+            if (fetchError) throw fetchError
+
+            if (data) {
+                console.log(`[Dashboard] ✓ Data fetched. Raised: ${data.raised_amount} BCH`)
+                setProject(data)
+            }
+        } catch (err) {
+            console.error('[Dashboard] Fetch error:', err.message)
+            setError(err.message)
+        } finally {
+            if (!isSilent) setLoading(false)
         }
-    }, [milestones, onVote])
+    }, [initialProject.id])
+
+    // Load data on mount
+    useEffect(() => {
+        fetchProjectData()
+    }, [fetchProjectData])
+
+    // ── Handlers ──────────────────────────────────────────────────────────────
+
+    /**
+     * handleFundComplete()
+     * 
+     * Wrapper for the onFund prop.
+     * After the parent handles the transaction and DB update, we refetch.
+     */
+    const handleFundComplete = async (amount, txHash) => {
+        console.log(`[Dashboard] Funding complete. Refreshing UI...`)
+        // 1. Notify parent (which records tx and updates DB)
+        if (onFund) await onFund(amount, txHash)
+
+        // 2. Refresh local data from DB to reflect the new raised_amount
+        await fetchProjectData(true)
+    }
+
+    const handleGovApproval = useCallback((milestoneId) => {
+        if (onVote) onVote(milestoneId, 'yes')
+    }, [onVote])
+
+    // ── Derived Values ────────────────────────────────────────────────────────
+
+    // Support both Supabase and fallback naming
+    const title = project?.title ?? 'Untitled Project'
+    const description = project?.description ?? ''
+    const fundingTarget = parseFloat(project?.goal_amount ?? project?.fundingTarget ?? 0)
+    const fundedAmount = parseFloat(project?.raised_amount ?? project?.fundedAmount ?? 0)
+    const milestones = Array.isArray(project?.milestones) ? project.milestones : []
+    const approvedCount = milestones.filter(m => m.status === 'Approved' || m.status === 'approved').length
+
+    // ── Render Logic ──────────────────────────────────────────────────────────
+
+    if (loading && !project) return <LoadingSpinner />
 
     return (
-        <div className="max-w-3xl mx-auto">
+        <div className="max-w-3xl mx-auto pb-20">
             {/* ── Page header ───────────────────────────────────────────────── */}
             <div className="mb-8 flex items-center justify-between">
                 <div>
@@ -52,6 +125,12 @@ export default function Dashboard({ project, onFund, onVote, onTransaction, onRe
                 </button>
             </div>
 
+            {error && (
+                <div className="mb-6 p-4 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-sm">
+                    ⚠️ Error updating project data: {error}
+                </div>
+            )}
+
             {/* ── Stats Row ─────────────────────────────────────────────────── */}
             <div className="grid grid-cols-3 gap-4 mb-6">
                 <div className="card-glass rounded-2xl p-5">
@@ -59,7 +138,12 @@ export default function Dashboard({ project, onFund, onVote, onTransaction, onRe
                     <p className="text-2xl font-bold text-white">{fundingTarget.toFixed(2)}</p>
                     <p className="text-emerald-400 text-sm font-semibold mt-0.5">BCH</p>
                 </div>
-                <div className="card-glass rounded-2xl p-5 glow-green">
+                <div className="card-glass rounded-2xl p-5 glow-green relative overflow-hidden">
+                    {loading && (
+                        <div className="absolute inset-0 bg-emerald-500/5 backdrop-blur-[1px] flex items-center justify-center">
+                            <div className="w-4 h-4 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
+                        </div>
+                    )}
                     <p className="text-slate-500 text-xs font-semibold uppercase tracking-wider mb-1">Raised</p>
                     <p className="text-2xl font-bold" style={{ color: '#10b981' }}>{fundedAmount.toFixed(8)}</p>
                     <p className="text-emerald-400 text-sm font-semibold mt-0.5">BCH</p>
@@ -79,11 +163,14 @@ export default function Dashboard({ project, onFund, onVote, onTransaction, onRe
                 </div>
                 <hr className="section-divider" />
                 <ProgressBar current={fundedAmount} target={fundingTarget} />
+                <p className="text-[10px] text-slate-500 mt-3 text-center italic">
+                    All data fetched live from Supabase PostgreSQL
+                </p>
             </div>
 
             {/* ── Wallet Panel ───────────────────────────────────── */}
             <WalletPanel
-                onRealFund={onFund}
+                onRealFund={handleFundComplete}
                 onWalletConnect={setConnectedWallet}
             />
 
@@ -92,7 +179,10 @@ export default function Dashboard({ project, onFund, onVote, onTransaction, onRe
                 wallet={connectedWallet}
                 milestones={milestones}
                 onMilestoneApproved={handleGovApproval}
-                onTransaction={onTransaction}
+                onTransaction={async (amt, hash, type) => {
+                    if (onTransaction) await onTransaction(amt, hash, type)
+                    await fetchProjectData(true)
+                }}
             />
 
             {/* ── Milestones Section ────────────────────────────────────────── */}
@@ -111,14 +201,21 @@ export default function Dashboard({ project, onFund, onVote, onTransaction, onRe
                 </div>
 
                 <div className="space-y-4">
-                    {milestones.map((milestone, index) => (
-                        <MilestoneCard
-                            key={milestone.id}
-                            milestone={milestone}
-                            index={index}
-                            onVote={onVote}
-                        />
-                    ))}
+                    {milestones.length > 0 ? (
+                        milestones.map((milestone, index) => (
+                            <MilestoneCard
+                                key={milestone.id}
+                                milestone={milestone}
+                                index={index}
+                                onVote={async (id, type) => {
+                                    if (onVote) await onVote(id, type)
+                                    await fetchProjectData(true)
+                                }}
+                            />
+                        ))
+                    ) : (
+                        <p className="text-slate-500 text-sm text-center py-4">No milestones defined for this project.</p>
+                    )}
                 </div>
 
                 {approvedCount === milestones.length && milestones.length > 0 && (

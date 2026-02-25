@@ -334,26 +334,52 @@ export async function updateRaisedAmount(id, amount) {
         return { data: null, error: { message: 'Valid project id and positive amount required.' } }
     }
 
-    console.log('[updateRaisedAmount] ▶ Incrementing raised_amount for project:', id, 'by', amount)
+    console.log('[updateRaisedAmount] ▶ Updating raised_amount for project:', id, 'by', amount)
 
     try {
         requireClient()
 
-        const { data, error } = await supabase.rpc('increment_raised_amount', {
+        // ── Strategy A: Try Atomic RPC (safest for concurrency) ────────────────
+        const { data, error: rpcError } = await supabase.rpc('increment_raised_amount', {
             p_id: id,
             p_amount: amount,
         })
 
-        if (error) {
-            console.error('[updateRaisedAmount] ✗ RPC error:', error)
-            return { data: null, error }
+        if (!rpcError) {
+            console.info('[updateRaisedAmount] ✓ Success via RPC')
+            return { data, error: null }
         }
 
-        console.info('[updateRaisedAmount] ✓ Done. Result:', data)
-        return { data, error: null }
+        console.warn('[updateRaisedAmount] ⚠ RPC failed, falling back to FETCH + UPDATE style...')
+        console.warn('  (Note: You should run schema.sql to enable the atomic rpc for better safety.)')
+
+        // ── Strategy B: Fallback Fetch + Update (easier for beginners) ─────────
+        // 1. Get current amount
+        const { data: current, error: fetchErr } = await supabase
+            .from(TABLE)
+            .select('raised_amount')
+            .eq('id', id)
+            .single()
+
+        if (fetchErr) throw fetchErr
+
+        const newTotal = parseFloat(current.raised_amount || 0) + parseFloat(amount)
+
+        // 2. Update to new total
+        const { data: updated, error: updateErr } = await supabase
+            .from(TABLE)
+            .update({ raised_amount: newTotal })
+            .eq('id', id)
+            .select()
+            .single()
+
+        if (updateErr) throw updateErr
+
+        console.info('[updateRaisedAmount] ✓ Success via fallback update. New Total:', newTotal)
+        return { data: updated, error: null }
 
     } catch (err) {
-        console.error('[updateRaisedAmount] ✗ Exception:', err)
+        console.error('[updateRaisedAmount] ✗ Failed to update raised amount:', err.message)
         return { data: null, error: { message: err.message } }
     }
 }
