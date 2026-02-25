@@ -4,7 +4,7 @@ import MilestoneCard from './MilestoneCard'
 import WalletPanel from './WalletPanel'
 import GovernancePanel from './GovernancePanel'
 
-export default function Dashboard({ project, onFund, onVote, onReset }) {
+export default function Dashboard({ project, onFund, onVote, onTransaction, onReset }) {
     // Support both old ProjectForm shape and new Supabase schema shape
     const title = project.title ?? 'Untitled Project'
     const description = project.description ?? ''
@@ -92,6 +92,7 @@ export default function Dashboard({ project, onFund, onVote, onReset }) {
                 wallet={connectedWallet}
                 milestones={milestones}
                 onMilestoneApproved={handleGovApproval}
+                onTransaction={onTransaction}
             />
 
             {/* ── Milestones Section ────────────────────────────────────────── */}

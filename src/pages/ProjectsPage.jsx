@@ -37,7 +37,8 @@ import {
 } from 'lucide-react'
 
 import { supabase } from '../lib/supabaseClient'
-import { createProject, deleteProject } from '../lib/db/projects'
+import { createProject, deleteProject, updateRaisedAmount } from '../lib/db/projects'
+import { insertTransaction } from '../lib/db/transactions'
 import ProjectCard from '../components/ProjectCard'
 import ProjectForm from '../components/ProjectForm'
 import Dashboard from '../components/Dashboard'
@@ -157,8 +158,43 @@ export default function ProjectsPage() {
         setShowForm(false)
     }
 
-    const handleFund = (amount) =>
-        setActiveProject(prev => ({ ...prev, raised_amount: (parseFloat(prev.raised_amount) + amount).toFixed(8) }))
+    const handleTransaction = async (amount, txHash, type = 'funding') => {
+        if (!activeProject) return
+        console.log(`[ProjectsPage] handleTransaction: ${type} of ${amount} BCH (${txHash})`)
+
+        // 1. Record in transactions table
+        if (txHash) {
+            try {
+                await insertTransaction({
+                    projectId: activeProject.id,
+                    txHash,
+                    amount,
+                    type,
+                })
+                console.log(`[ProjectsPage] ✓ ${type} recorded in database`)
+            } catch (err) {
+                console.error(`[ProjectsPage] Database error for ${type}:`, err.message)
+            }
+        }
+
+        // 2. If it's a funding transaction, increment the project's raised_amount
+        if (type === 'funding') {
+            try {
+                await updateRaisedAmount(activeProject.id, amount)
+                console.log('[ProjectsPage] ✓ raised_amount incremented in projects table')
+            } catch (err) {
+                console.error('[ProjectsPage] Failed to update project total:', err.message)
+            }
+
+            // Update local state for immediate UI feedback
+            setActiveProject(prev => ({
+                ...prev,
+                raised_amount: (parseFloat(prev.raised_amount) + amount).toFixed(8)
+            }))
+        }
+    }
+
+    const handleFund = (amount, txHash) => handleTransaction(amount, txHash, 'funding')
 
     const handleVote = (milestoneId, voteType) =>
         setActiveProject(prev => ({
@@ -194,6 +230,7 @@ export default function ProjectsPage() {
                 project={activeProject}
                 onFund={handleFund}
                 onVote={handleVote}
+                onTransaction={handleTransaction}
                 onReset={handleReset}
             />
         )

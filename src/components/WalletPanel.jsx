@@ -112,7 +112,7 @@ export default function WalletPanel({ onRealFund, onWalletConnect }) {
             const hash = await fundProject(wallet, parsed)
             setTxId(hash)
             setTxStatus('success')
-            if (onRealFund) onRealFund(parsed)
+            if (onRealFund) onRealFund(parsed, hash)
             await refreshBalance()
         } catch (e) {
             console.error(e)

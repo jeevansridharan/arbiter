@@ -56,7 +56,7 @@ function VoteBar({ votes }) {
 // ─────────────────────────────────────────────────────────────────────────────
 // MAIN COMPONENT
 // ─────────────────────────────────────────────────────────────────────────────
-export default function GovernancePanel({ wallet, milestones = [], onMilestoneApproved }) {
+export default function GovernancePanel({ wallet, milestones = [], onMilestoneApproved, onTransaction }) {
     // ── State ─────────────────────────────────────────────────────────────────
     const [tokenBal, setTokenBal] = useState(0)
     const [lockedBch, setLockedBch] = useState(0)
@@ -103,6 +103,9 @@ export default function GovernancePanel({ wallet, milestones = [], onMilestoneAp
             if (!parsed || parsed <= 0) throw new Error('Enter a valid BCH amount')
             const result = await fundMilestoneContract(wallet, parsed, PROJECT_ADDRESS)
             setMintResult(result)
+            if (onTransaction) {
+                onTransaction(parsed, result.simulatedTxId, 'funding')
+            }
             refreshState()
         } catch (e) {
             setError(e.message || 'Minting failed')
@@ -133,6 +136,9 @@ export default function GovernancePanel({ wallet, milestones = [], onMilestoneAp
         try {
             const txId = await releaseMilestoneFunds(wallet, amountBch, PROJECT_ADDRESS)
             setReleaseTxId(prev => ({ ...prev, [milestoneId]: txId }))
+            if (onTransaction) {
+                onTransaction(amountBch, txId, 'release')
+            }
             refreshState()
         } catch (e) {
             setError(e.message || 'Release failed')
