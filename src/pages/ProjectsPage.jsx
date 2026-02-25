@@ -45,7 +45,7 @@ import Dashboard from '../components/Dashboard'
 // ── TODO: Replace with the currently connected wallet address ─────────────────
 // If you have a wallet context/hook, import it here and pass the address down.
 // For now we use a placeholder so the owner_wallet field is never empty.
-const PLACEHOLDER_WALLET = 'bchtest:not_connected_yet'
+const PLACEHOLDER_WALLET = 'bchtest:qp0000000000000000000000000000000000000000'
 
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -262,13 +262,13 @@ export default function ProjectsPage() {
                         onClick={() => setShowForm(true)}
                         style={{
                             padding: '9px 18px', borderRadius: '10px', cursor: 'pointer',
-                            background: 'linear-gradient(135deg,#7c3aed,#4f46e5)',
+                            background: 'linear-gradient(135deg,#10b981,#059669)',
                             border: 'none', color: '#fff', fontWeight: 700, fontSize: '0.85rem',
                             display: 'flex', alignItems: 'center', gap: '7px',
-                            boxShadow: '0 0 20px rgba(124,58,237,0.3)', transition: 'all 0.2s',
+                            boxShadow: '0 0 20px rgba(16,185,129,0.3)', transition: 'all 0.2s',
                         }}
-                        onMouseEnter={e => e.currentTarget.style.boxShadow = '0 0 28px rgba(124,58,237,0.5)'}
-                        onMouseLeave={e => e.currentTarget.style.boxShadow = '0 0 20px rgba(124,58,237,0.3)'}
+                        onMouseEnter={e => e.currentTarget.style.boxShadow = '0 0 28px rgba(16,185,129,0.5)'}
+                        onMouseLeave={e => e.currentTarget.style.boxShadow = '0 0 20px rgba(16,185,129,0.3)'}
                     >
                         <Plus size={16} /> New Project
                     </button>
@@ -331,10 +331,10 @@ export default function ProjectsPage() {
                 }}>
                     <div style={{
                         width: '64px', height: '64px', borderRadius: '16px', margin: '0 auto 20px',
-                        background: 'rgba(124,58,237,0.08)', border: '1px solid rgba(124,58,237,0.15)',
+                        background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.15)',
                         display: 'flex', alignItems: 'center', justifyContent: 'center',
                     }}>
-                        <Inbox size={28} color="#4c1d95" />
+                        <Inbox size={28} color="#10b981" />
                     </div>
                     <p style={{ color: '#e2e8f0', fontWeight: 700, fontSize: '1.05rem', marginBottom: '8px' }}>
                         No projects yet
@@ -346,10 +346,10 @@ export default function ProjectsPage() {
                         onClick={() => setShowForm(true)}
                         style={{
                             padding: '10px 24px', borderRadius: '10px', cursor: 'pointer',
-                            background: 'linear-gradient(135deg,#7c3aed,#4f46e5)',
+                            background: 'linear-gradient(135deg,#10b981,#059669)',
                             border: 'none', color: '#fff', fontWeight: 700, fontSize: '0.875rem',
                             display: 'inline-flex', alignItems: 'center', gap: '8px',
-                            boxShadow: '0 0 20px rgba(124,58,237,0.3)',
+                            boxShadow: '0 0 20px rgba(16,185,129,0.3)',
                         }}
                     >
                         <Plus size={16} /> Create First Project
@@ -364,9 +364,9 @@ export default function ProjectsPage() {
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '20px' }}>
                         <div style={{
                             padding: '4px 12px', borderRadius: '999px',
-                            background: 'rgba(124,58,237,0.1)', border: '1px solid rgba(124,58,237,0.2)',
+                            background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.2)',
                         }}>
-                            <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#a78bfa' }}>
+                            <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#10b981' }}>
                                 {projects.length} PROJECT{projects.length !== 1 ? 'S' : ''}
                             </span>
                         </div>

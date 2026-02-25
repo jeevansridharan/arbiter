@@ -41,7 +41,7 @@ export default function Sidebar() {
                 width: collapsed ? '72px' : '240px',
                 minHeight: '100vh',
                 background: 'linear-gradient(180deg, #0d0e1f 0%, #0a0b14 60%, #0d0f1e 100%)',
-                borderRight: '1px solid rgba(139,92,246,0.12)',
+                borderRight: '1px solid rgba(16,185,129,0.12)',
                 display: 'flex',
                 flexDirection: 'column',
                 position: 'fixed',
@@ -59,7 +59,7 @@ export default function Sidebar() {
                     display: 'flex',
                     alignItems: 'center',
                     gap: '10px',
-                    borderBottom: '1px solid rgba(139,92,246,0.1)',
+                    borderBottom: '1px solid rgba(16,185,129,0.1)',
                     minHeight: '72px',
                     justifyContent: collapsed ? 'center' : 'flex-start',
                 }}
@@ -69,12 +69,12 @@ export default function Sidebar() {
                     width: '36px',
                     height: '36px',
                     borderRadius: '10px',
-                    background: 'linear-gradient(135deg, #7c3aed, #4f46e5)',
+                    background: 'linear-gradient(135deg, #10b981, #059669)',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
                     flexShrink: 0,
-                    boxShadow: '0 0 20px rgba(124,58,237,0.4)',
+                    boxShadow: '0 0 20px rgba(16,185,129,0.4)',
                 }}>
                     <Zap size={18} color="white" strokeWidth={2.5} />
                 </div>
@@ -120,10 +120,10 @@ export default function Sidebar() {
                                 textDecoration: 'none',
                                 transition: 'all 0.2s ease',
                                 background: isActive
-                                    ? 'linear-gradient(135deg, rgba(124,58,237,0.25), rgba(79,70,229,0.15))'
+                                    ? 'linear-gradient(135deg, rgba(16,185,129,0.25), rgba(5,150,105,0.15))'
                                     : 'transparent',
                                 border: isActive
-                                    ? '1px solid rgba(139,92,246,0.3)'
+                                    ? '1px solid rgba(16,185,129,0.3)'
                                     : '1px solid transparent',
                                 position: 'relative',
                             }}
@@ -138,15 +138,15 @@ export default function Sidebar() {
                                     transform: 'translateY(-50%)',
                                     width: '3px',
                                     height: '60%',
-                                    background: 'linear-gradient(180deg, #7c3aed, #4f46e5)',
+                                    background: 'linear-gradient(180deg, #10b981, #059669)',
                                     borderRadius: '0 3px 3px 0',
-                                    boxShadow: '0 0 8px rgba(124,58,237,0.6)',
+                                    boxShadow: '0 0 8px rgba(16,185,129,0.6)',
                                 }} />
                             )}
 
                             <Icon
                                 size={20}
-                                color={isActive ? '#a78bfa' : '#475569'}
+                                color={isActive ? '#34d399' : '#475569'}
                                 strokeWidth={isActive ? 2.5 : 2}
                                 style={{ flexShrink: 0, transition: 'color 0.2s' }}
                             />

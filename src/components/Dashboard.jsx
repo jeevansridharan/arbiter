@@ -16,13 +16,12 @@ export default function Dashboard({ project, onFund, onVote, onReset }) {
     const milestones = Array.isArray(project.milestones) ? project.milestones : []
     const approvedCount = milestones.filter(m => m.status === 'Approved').length
 
-    // ── Week 3: track the connected wallet object so GovernancePanel can use it
+    // ── track the connected wallet object so GovernancePanel can use it
     const [connectedWallet, setConnectedWallet] = useState(null)
 
     // Handle governance approval — syncs with the existing onVote system
     const handleGovApproval = useCallback((milestoneId) => {
         // Force the milestone to "Approved" via the parent vote handler
-        // by casting enough yes votes to clear any no votes
         const milestone = milestones.find(m => m.id === milestoneId)
         if (milestone && milestone.status !== 'Approved') {
             onVote(milestoneId, 'yes')
@@ -49,7 +48,7 @@ export default function Dashboard({ project, onFund, onVote, onReset }) {
                     className="px-4 py-2 rounded-xl text-sm font-medium text-slate-400 hover:text-slate-200 transition-colors"
                     style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}
                 >
-                    ← New Project
+                    ← All Projects
                 </button>
             </div>
 
@@ -62,13 +61,13 @@ export default function Dashboard({ project, onFund, onVote, onReset }) {
                 </div>
                 <div className="card-glass rounded-2xl p-5 glow-green">
                     <p className="text-slate-500 text-xs font-semibold uppercase tracking-wider mb-1">Raised</p>
-                    <p className="text-2xl font-bold" style={{ color: '#4ade80' }}>{fundedAmount.toFixed(4)}</p>
+                    <p className="text-2xl font-bold" style={{ color: '#10b981' }}>{fundedAmount.toFixed(8)}</p>
                     <p className="text-emerald-400 text-sm font-semibold mt-0.5">BCH</p>
                 </div>
                 <div className="card-glass rounded-2xl p-5">
                     <p className="text-slate-500 text-xs font-semibold uppercase tracking-wider mb-1">Milestones</p>
                     <p className="text-2xl font-bold text-white">{approvedCount}/{milestones.length}</p>
-                    <p className="text-violet-400 text-sm font-semibold mt-0.5">Approved</p>
+                    <p className="text-cyan-400 text-sm font-semibold mt-0.5">Approved</p>
                 </div>
             </div>
 
@@ -82,13 +81,13 @@ export default function Dashboard({ project, onFund, onVote, onReset }) {
                 <ProgressBar current={fundedAmount} target={fundingTarget} />
             </div>
 
-            {/* ── Week 2: BCH Wallet Panel ───────────────────────────────────── */}
+            {/* ── Wallet Panel ───────────────────────────────────── */}
             <WalletPanel
                 onRealFund={onFund}
                 onWalletConnect={setConnectedWallet}
             />
 
-            {/* ── Week 3: Governance + Milestone Locking Panel ──────────────── */}
+            {/* ── Governance + Milestone Locking Panel ──────────────── */}
             <GovernancePanel
                 wallet={connectedWallet}
                 milestones={milestones}
@@ -104,7 +103,7 @@ export default function Dashboard({ project, onFund, onVote, onReset }) {
                     </div>
                     <div
                         className="flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold"
-                        style={{ background: 'rgba(139,92,246,0.12)', border: '1px solid rgba(139,92,246,0.25)', color: '#a78bfa' }}
+                        style={{ background: 'rgba(16,185,129,0.12)', border: '1px solid rgba(16,185,129,0.25)', color: '#34d399' }}
                     >
                         {approvedCount}/{milestones.length} done
                     </div>

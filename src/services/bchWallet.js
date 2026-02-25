@@ -128,6 +128,9 @@ export function getChipnetExplorerUrl(txId) {
     return `https://chipnet.imaginary.cash/tx/${txId}`
 }
 
+/** Alias for consistency across components */
+export const getExplorerUrl = getChipnetExplorerUrl
+
 /**
  * shortenAddress(address)
  *

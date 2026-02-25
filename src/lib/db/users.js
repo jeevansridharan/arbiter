@@ -3,7 +3,7 @@
  *
  * All Supabase operations for the `users` table.
  *
- * In Milestara, a "user" is identified by their BCH wallet address.
+ * In Milestara, a "user" is identified by their Ethereum wallet address.
  * No email/password — the wallet IS the identity (Web3 pattern).
  *
  * Schema (run in Supabase SQL Editor):
@@ -33,7 +33,7 @@ function requireSupabase() {
  *
  * This is called every time a wallet connects — safe to call repeatedly.
  *
- * @param   {string} walletAddress  BCH cashaddr (e.g. "bchtest:qp...")
+ * @param   {string} walletAddress  Ethereum address (e.g. "0x...")
  * @returns {Promise<{ data: User, error: Error|null }>}
  */
 export async function upsertUser(walletAddress) {
@@ -65,7 +65,7 @@ export async function upsertUser(walletAddress) {
 /**
  * getUserByWallet(walletAddress)
  *
- * Fetch a user by their BCH wallet address.
+ * Fetch a user by their Ethereum wallet address.
  * Returns null if the user doesn't exist yet.
  *
  * @param   {string} walletAddress

@@ -124,7 +124,7 @@ export default function DashboardPage() {
     useEffect(() => { loadStats() }, [])
 
     return (
-        <div>
+        <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
             {/* ── Page header ──────────────────────────────────────────────── */}
             <div style={{ marginBottom: '36px' }}>
                 <div style={{
@@ -133,7 +133,7 @@ export default function DashboardPage() {
                     background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.25)',
                 }}>
                     <div style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#10b981', boxShadow: '0 0 6px rgba(16,185,129,0.8)' }} />
-                    <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#10b981', letterSpacing: '0.06em' }}>LIVE · CHIPNET TESTNET</span>
+                    <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#34d399', letterSpacing: '0.06em' }}>LIVE · CHIPNET TESTNET</span>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
                     <div>
@@ -141,7 +141,7 @@ export default function DashboardPage() {
                             Welcome to Milestara
                         </h1>
                         <p style={{ color: '#64748b', fontSize: '0.95rem' }}>
-                            Milestone-based funding platform on Bitcoin Cash
+                            Milestone-based funding platform on Bitcoin Cash Chipnet
                         </p>
                     </div>
                     {/* Refresh button */}
@@ -155,7 +155,7 @@ export default function DashboardPage() {
                             color: '#64748b', fontSize: '0.78rem', fontWeight: 600,
                             transition: 'all 0.2s',
                         }}
-                        onMouseEnter={e => { e.currentTarget.style.color = '#a78bfa'; e.currentTarget.style.borderColor = 'rgba(167,139,250,0.3)' }}
+                        onMouseEnter={e => { e.currentTarget.style.color = '#10b981'; e.currentTarget.style.borderColor = 'rgba(16,185,129,0.3)' }}
                         onMouseLeave={e => { e.currentTarget.style.color = '#64748b'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)' }}
                     >
                         <RefreshCw size={13} />
@@ -164,21 +164,70 @@ export default function DashboardPage() {
                 </div>
             </div>
 
-            {/* ── Stats grid ────────────────────────────────────────────────── */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '16px', marginBottom: '32px' }}>
-                <StatCard label="Total Projects" value={stats.projects} sub="Active on Chipnet" accentColor="#7c3aed" Icon={FolderKanban} loading={loading} />
-                <StatCard label="BCH Raised" value={stats.bchRaised} sub="Test BCH (tBCH)" accentColor="#10b981" Icon={Bitcoin} loading={loading} />
-                <StatCard label="Votes Cast" value={stats.votes} sub="Governance tokens" accentColor="#06b6d4" Icon={Vote} loading={loading} />
+            {/* Dashboard Stats */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: '16px', marginBottom: '28px' }}>
+                {[
+                    { label: 'Total Funded', value: stats.bchRaised, unit: 'BCH', color: '#10b981' },
+                    { label: 'Active Projects', value: stats.projects, unit: 'PROJ', color: '#34d399' },
+                    { label: 'Community Members', value: '852', unit: 'USERS', color: '#06b6d4' },
+                    { label: 'Votes Cast', value: stats.votes, unit: 'VOTES', color: '#a78bfa' },
+                ].map(({ label, value, unit, color }) => (
+                    <div key={label} style={{
+                        background: 'rgba(15,17,35,0.85)',
+                        border: `1px solid ${color}30`,
+                        borderRadius: '16px',
+                        padding: '24px',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '12px',
+                        backdropFilter: 'blur(20px)',
+                        transition: 'transform 0.2s, box-shadow 0.2s',
+                    }}
+                        onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = `0 8px 32px ${color}20` }}
+                        onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'none' }}
+                    >
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                            <span style={{ fontSize: '0.72rem', fontWeight: 600, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.08em' }}>{label}</span>
+                            <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: `${color}15`, border: `1px solid ${color}30`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                {label === 'Total Funded' ? <Bitcoin size={16} color={color} /> :
+                                    label === 'Active Projects' ? <FolderKanban size={16} color={color} /> :
+                                        label === 'Community Members' ? <TrendingUp size={16} color={color} /> :
+                                            <Vote size={16} color={color} />}
+                            </div>
+                        </div>
+                        <div>
+                            {loading ? (
+                                <div style={{ width: '60px', height: '32px', borderRadius: '6px', background: 'rgba(255,255,255,0.06)', animation: 'pulse 1.5s ease-in-out infinite' }} />
+                            ) : (
+                                <p style={{ fontSize: '2rem', fontWeight: 800, color: '#f1f5f9', lineHeight: 1 }}>{value}</p>
+                            )}
+                            <p style={{ fontSize: '0.75rem', color: color, fontWeight: 600, marginTop: '4px' }}>{unit}</p>
+                        </div>
+                    </div>
+                ))}
             </div>
 
-            {/* ── Quick actions ─────────────────────────────────────────────── */}
-            <div style={{ marginBottom: '32px' }}>
-                <h2 style={{ fontSize: '0.8rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '14px' }}>
+            {/* Quick Actions */}
+            <div style={{ marginBottom: '28px' }}>
+                <h2 style={{ fontSize: '1rem', fontWeight: 700, color: '#f1f5f9', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <div style={{ width: '4px', height: '16px', background: '#10b981', borderRadius: '4px' }}></div>
                     Quick Actions
                 </h2>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                    <QuickAction to="/projects" Icon={FolderKanban} title="Create or Browse Projects" description="Fund a milestone-based project on Chipnet" color="#7c3aed" />
-                    <QuickAction to="/governance" Icon={Vote} title="Governance Voting" description="Use GOV tokens to vote on milestones" color="#10b981" />
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: '16px' }}>
+                    <button style={{
+                        padding: '16px', borderRadius: '14px', background: 'rgba(16,185,129,0.06)', border: '1px solid rgba(16,185,129,0.15)',
+                        display: 'flex', alignItems: 'center', gap: '12px', transition: 'all 0.2s', cursor: 'pointer', textAlign: 'left'
+                    }} onMouseEnter={e => e.currentTarget.style.borderColor = 'rgba(16,185,129,0.4)'} onMouseLeave={e => e.currentTarget.style.borderColor = 'rgba(16,185,129,0.15)'}>
+                        <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: 'rgba(16,185,129,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            <Zap size={20} color="#10b981" />
+                        </div>
+                        <div>
+                            <p style={{ color: '#e2e8f0', fontWeight: 700, fontSize: '0.9rem' }}>Fast Funding</p>
+                            <p style={{ color: '#64748b', fontSize: '0.75rem' }}>Send BCH Chipnet to active projects</p>
+                        </div>
+                    </button>
+                    <QuickAction to="/projects" Icon={FolderKanban} title="Create or Browse Projects" description="Fund a milestone-based project on Chipnet" color="#10b981" />
+                    <QuickAction to="/governance" Icon={Vote} title="Governance Voting" description="Use GOV tokens to vote on milestones" color="#34d399" />
                     <QuickAction to="/transactions" Icon={ArrowUpRight} title="Transaction History" description="View all on-chain BCH transactions" color="#06b6d4" />
                 </div>
             </div>
@@ -186,12 +235,12 @@ export default function DashboardPage() {
             {/* ── How it works ──────────────────────────────────────────────── */}
             <div style={{ background: 'rgba(15,17,35,0.85)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '16px', padding: '28px', backdropFilter: 'blur(20px)' }}>
                 <h2 style={{ color: '#e2e8f0', fontWeight: 700, fontSize: '1rem', marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <Zap size={18} color="#7c3aed" /> How Milestara Works
+                    <Zap size={18} color="#10b981" /> How Milestara Works
                 </h2>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '20px' }}>
                     {[
-                        { step: '01', title: 'Create Project', desc: 'Define milestones and funding target in BCH', color: '#7c3aed', Icon: FolderKanban },
-                        { step: '02', title: 'Fund & Get Tokens', desc: 'Lock BCH → receive governance tokens (1 = 1 vote)', color: '#10b981', Icon: TrendingUp },
+                        { step: '01', title: 'Create Project', desc: 'Define milestones and funding target in BCH', color: '#10b981', Icon: FolderKanban },
+                        { step: '02', title: 'Fund & Get Tokens', desc: 'Lock BCH → receive governance tokens (1 = 1 vote)', color: '#34d399', Icon: TrendingUp },
                         { step: '03', title: 'Vote & Release', desc: 'Approve milestones via token voting → release funds', color: '#06b6d4', Icon: Shield },
                     ].map(({ step, title, desc, color, Icon }) => (
                         <div key={step}>

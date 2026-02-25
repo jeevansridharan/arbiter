@@ -11,20 +11,21 @@ import { Calendar, Target, TrendingUp, Wallet, ArrowRight, Trash2 } from 'lucide
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 /**
- * Formats a BCH numeric value to 6 decimal places.
- * e.g. 0.005 → "0.005000 BCH"
+ * Formats a BCH numeric value to 8 decimal places.
+ * e.g. 0.005 → "0.00500000 BCH"
  */
 function formatBCH(value) {
-    return `${parseFloat(value || 0).toFixed(6)} BCH`
+    return `${parseFloat(value || 0).toFixed(8)} BCH`
 }
 
 /**
- * Shortens a wallet address for display.
- * e.g. "bchtest:qpabcd...xyz" → "bchtest:qpab...xyz"
+ * Shortens a BCH cashaddr for display.
+ * e.g. "bchtest:qp...abcd"
  */
 function shortWallet(addr) {
-    if (!addr || addr.length < 16) return addr
-    return `${addr.slice(0, 14)}...${addr.slice(-6)}`
+    if (!addr || !addr.includes(':')) return addr
+    const [prefix, body] = addr.split(':')
+    return `${prefix}:${body.slice(0, 4)}...${body.slice(-4)}`
 }
 
 /**
@@ -44,9 +45,9 @@ function formatDate(isoString) {
  */
 function statusStyle(status) {
     const map = {
-        active: { bg: 'rgba(16,185,129,0.1)', border: 'rgba(16,185,129,0.3)', color: '#10b981' },
-        funded: { bg: 'rgba(6,182,212,0.1)', border: 'rgba(6,182,212,0.3)', color: '#06b6d4' },
-        completed: { bg: 'rgba(139,92,246,0.1)', border: 'rgba(139,92,246,0.3)', color: '#a78bfa' },
+        active: { bg: 'rgba(16,185,129,0.1)', border: 'rgba(16,185,129,0.3)', color: '#34d399' },
+        funded: { bg: 'rgba(5,150,105,0.1)', border: 'rgba(5,150,105,0.3)', color: '#10b981' },
+        completed: { bg: 'rgba(6,182,212,0.1)', border: 'rgba(6,182,212,0.3)', color: '#06b6d4' },
         cancelled: { bg: 'rgba(239,68,68,0.08)', border: 'rgba(239,68,68,0.25)', color: '#f87171' },
     }
     return map[status] ?? map.active
@@ -88,8 +89,8 @@ export default function ProjectCard({ project, onView, onDelete }) {
             }}
             onMouseEnter={e => {
                 e.currentTarget.style.transform = 'translateY(-3px)'
-                e.currentTarget.style.borderColor = 'rgba(139,92,246,0.3)'
-                e.currentTarget.style.boxShadow = '0 8px 32px rgba(124,58,237,0.12)'
+                e.currentTarget.style.borderColor = 'rgba(16,185,129,0.3)'
+                e.currentTarget.style.boxShadow = '0 8px 32px rgba(16,185,129,0.12)'
             }}
             onMouseLeave={e => {
                 e.currentTarget.style.transform = 'translateY(0)'
@@ -125,14 +126,14 @@ export default function ProjectCard({ project, onView, onDelete }) {
             <div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
                     <span style={{ fontSize: '0.72rem', color: '#475569', fontWeight: 600 }}>FUNDING PROGRESS</span>
-                    <span style={{ fontSize: '0.78rem', color: '#a78bfa', fontWeight: 800 }}>{percent.toFixed(1)}%</span>
+                    <span style={{ fontSize: '0.78rem', color: '#34d399', fontWeight: 800 }}>{percent.toFixed(1)}%</span>
                 </div>
                 {/* Track */}
                 <div style={{ height: '6px', background: 'rgba(255,255,255,0.06)', borderRadius: '999px', overflow: 'hidden' }}>
                     {/* Fill */}
                     <div style={{
                         height: '100%', borderRadius: '999px', width: `${percent}%`,
-                        background: 'linear-gradient(90deg, #7c3aed, #10b981)',
+                        background: 'linear-gradient(90deg, #10b981, #06b6d4)',
                         transition: 'width 0.6s cubic-bezier(0.4,0,0.2,1)',
                         minWidth: percent > 0 ? '6px' : '0',
                     }} />
@@ -154,7 +155,7 @@ export default function ProjectCard({ project, onView, onDelete }) {
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '14px' }}>
                 {/* Goal amount */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                    <Target size={13} color="#7c3aed" />
+                    <Target size={13} color="#10b981" />
                     <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>
                         {formatBCH(goal_amount)}
                     </span>
@@ -162,7 +163,7 @@ export default function ProjectCard({ project, onView, onDelete }) {
 
                 {/* Raised */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                    <TrendingUp size={13} color="#10b981" />
+                    <TrendingUp size={13} color="#34d399" />
                     <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>
                         {formatBCH(raised_amount)} raised
                     </span>
@@ -194,9 +195,9 @@ export default function ProjectCard({ project, onView, onDelete }) {
                         flex: 1,
                         padding: '10px',
                         borderRadius: '10px',
-                        background: 'rgba(124,58,237,0.08)',
-                        border: '1px solid rgba(124,58,237,0.2)',
-                        color: '#a78bfa',
+                        background: 'rgba(16,185,129,0.08)',
+                        border: '1px solid rgba(16,185,129,0.2)',
+                        color: '#34d399',
                         fontWeight: 700,
                         fontSize: '0.82rem',
                         cursor: 'pointer',
@@ -207,12 +208,12 @@ export default function ProjectCard({ project, onView, onDelete }) {
                         transition: 'all 0.2s ease',
                     }}
                     onMouseEnter={e => {
-                        e.currentTarget.style.background = 'rgba(124,58,237,0.15)'
-                        e.currentTarget.style.borderColor = 'rgba(124,58,237,0.4)'
+                        e.currentTarget.style.background = 'rgba(16,185,129,0.15)'
+                        e.currentTarget.style.borderColor = 'rgba(16,185,129,0.4)'
                     }}
                     onMouseLeave={e => {
-                        e.currentTarget.style.background = 'rgba(124,58,237,0.08)'
-                        e.currentTarget.style.borderColor = 'rgba(124,58,237,0.2)'
+                        e.currentTarget.style.background = 'rgba(16,185,129,0.08)'
+                        e.currentTarget.style.borderColor = 'rgba(16,185,129,0.2)'
                     }}
                     onClick={() => onView && onView(project)}
                 >

@@ -77,7 +77,7 @@ export async function testInsertProject() {
         description: 'Automated connectivity test — safe to delete.',
         goal_amount: 0.001,
         raised_amount: 0,
-        owner_wallet: 'bchtest:test_wallet_000',
+        owner_wallet: 'bchtest:qq0000000000000000000000000000000000000000',
         status: 'active',
     }
 
@@ -123,7 +123,7 @@ export async function testInsertProject() {
  * @param {string} projectData.title         - Project name (required)
  * @param {string} [projectData.description] - What the project does
  * @param {number} projectData.goal_amount   - Funding target in BCH (required)
- * @param {string} projectData.owner_wallet  - Creator's BCH wallet address (required)
+ * @param {string} projectData.owner_wallet  - Creator's Bitcoin Cash wallet address (required)
  * @param {string} [projectData.status]      - 'active' | 'funded' | 'completed' | 'cancelled'
  *
  * @returns {Promise<{data: Object|null, error: Object|null}>}
@@ -134,7 +134,7 @@ export async function testInsertProject() {
  *     title:        'My BCH App',
  *     description:  'A milestone-based crowdfund',
  *     goal_amount:  0.05,
- *     owner_wallet: 'bchtest:qp...',
+ *     owner_wallet: 'bchtest:...',
  *   })
  */
 export async function createProject({
@@ -158,7 +158,7 @@ export async function createProject({
 
     if (!owner_wallet || typeof owner_wallet !== 'string') {
         console.error('[createProject] Validation failed: owner_wallet missing')
-        return { data: null, error: { message: 'owner_wallet (BCH address) is required.' } }
+        return { data: null, error: { message: 'owner_wallet (Bitcoin Cash address) is required.' } }
     }
 
     if (!VALID_STATUSES.includes(status)) {

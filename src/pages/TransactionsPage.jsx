@@ -10,7 +10,7 @@ import { supabase, supabaseConfigured } from '../lib/supabase'
 // ── Badge per type ────────────────────────────────────────────────────────────
 const TYPE_META = {
     funding: { label: 'Funding', color: '#10b981', Icon: ArrowDownLeft },
-    release: { label: 'Release', color: '#7c3aed', Icon: ArrowUpRight },
+    release: { label: 'Release', color: '#34d399', Icon: ArrowUpRight },
     refund: { label: 'Refund', color: '#f59e0b', Icon: RotateCcw },
 }
 
@@ -52,7 +52,7 @@ function TxRow({ tx }) {
             {/* Amount */}
             <div style={{ textAlign: 'right', flexShrink: 0 }}>
                 <p style={{ fontSize: '1rem', fontWeight: 800, color: meta.color }}>
-                    {parseFloat(tx.amount).toFixed(6)}
+                    {parseFloat(tx.amount).toFixed(8)}
                 </p>
                 <p style={{ fontSize: '0.72rem', color: '#475569', fontWeight: 600 }}>BCH</p>
             </div>
@@ -63,7 +63,7 @@ function TxRow({ tx }) {
                     <Clock size={11} />
                     <span style={{ fontSize: '0.7rem' }}>{date}</span>
                 </div>
-                <a href={explorerUrl} target="_blank" rel="noreferrer" style={{ display: 'flex', alignItems: 'center', gap: '3px', color: '#7c3aed', fontSize: '0.7rem', textDecoration: 'none', fontWeight: 600 }}>
+                <a href={explorerUrl} target="_blank" rel="noreferrer" style={{ display: 'flex', alignItems: 'center', gap: '3px', color: '#10b981', fontSize: '0.7rem', textDecoration: 'none', fontWeight: 600 }}>
                     Explorer <ExternalLink size={10} />
                 </a>
             </div>
@@ -129,7 +129,7 @@ export default function TransactionsPage() {
                 {/* Body */}
                 {loading && (
                     <div style={{ padding: '60px', textAlign: 'center', color: '#475569' }}>
-                        <div className="animate-spin" style={{ width: '24px', height: '24px', border: '2px solid transparent', borderTop: '2px solid #7c3aed', borderRadius: '50%', margin: '0 auto 12px' }} />
+                        <div className="animate-spin" style={{ width: '24px', height: '24px', border: '2px solid transparent', borderTop: '2px solid #10b981', borderRadius: '50%', margin: '0 auto 12px' }} />
                         Loading transactions…
                     </div>
                 )}

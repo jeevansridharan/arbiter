@@ -29,8 +29,8 @@ export default function ProfilePage() {
     const [loading, setLoading] = useState(false)
 
     useEffect(() => {
-        const savedWif = localStorage.getItem('milestara_chipnet_wif')
-        if (savedWif) {
+        const savedKey = localStorage.getItem('milestara_chipnet_wif')
+        if (savedKey) {
             ; (async () => {
                 setLoading(true)
                 try {
@@ -72,10 +72,10 @@ export default function ProfilePage() {
             </div>
 
             {/* Wallet card */}
-            <div style={{ background: 'rgba(15,17,35,0.85)', border: '1px solid rgba(139,92,246,0.2)', borderRadius: '16px', padding: '28px', backdropFilter: 'blur(20px)', marginBottom: '20px' }}>
+            <div style={{ background: 'rgba(15,17,35,0.85)', border: '1px solid rgba(16,185,129,0.2)', borderRadius: '16px', padding: '28px', backdropFilter: 'blur(20px)', marginBottom: '20px' }}>
                 {/* Avatar */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '24px' }}>
-                    <div style={{ width: '60px', height: '60px', borderRadius: '16px', background: 'linear-gradient(135deg, #7c3aed, #4f46e5)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 0 24px rgba(124,58,237,0.4)' }}>
+                    <div style={{ width: '60px', height: '60px', borderRadius: '16px', background: 'linear-gradient(135deg, #10b981, #059669)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 0 24px rgba(16,185,129,0.4)' }}>
                         <Wallet size={26} color="white" />
                     </div>
                     <div>
@@ -92,10 +92,10 @@ export default function ProfilePage() {
                 {/* Details */}
                 {address ? (
                     <>
-                        <InfoRow label="Wallet Address" value={address} mono color="#a78bfa" />
-                        <InfoRow label="Network" value="BCH Chipnet (Testnet)" color="#10b981" />
-                        <InfoRow label="GOV Tokens" value={`${tokens} tokens`} color="#7c3aed" />
-                        <InfoRow label="Locked BCH" value={`${locked.toFixed(6)} BCH`} color="#10b981" />
+                        <InfoRow label="Wallet Address" value={address} mono color="#10b981" />
+                        <InfoRow label="Network" value="Bitcoin Cash Chipnet (Testnet)" color="#34d399" />
+                        <InfoRow label="GOV Tokens" value={`${tokens} tokens`} color="#10b981" />
+                        <InfoRow label="Locked BCH" value={`${locked.toFixed(8)} BCH`} color="#34d399" />
 
                         {/* Copy + explorer buttons */}
                         <div style={{ display: 'flex', gap: '10px', marginTop: '20px' }}>
@@ -103,9 +103,9 @@ export default function ProfilePage() {
                                 onClick={handleCopy}
                                 style={{
                                     flex: 1, padding: '10px', borderRadius: '10px', cursor: 'pointer',
-                                    background: copied ? 'rgba(16,185,129,0.15)' : 'rgba(139,92,246,0.1)',
-                                    border: copied ? '1px solid rgba(16,185,129,0.3)' : '1px solid rgba(139,92,246,0.25)',
-                                    color: copied ? '#10b981' : '#a78bfa', fontWeight: 700, fontSize: '0.82rem',
+                                    background: copied ? 'rgba(16,185,129,0.15)' : 'rgba(16,185,129,0.1)',
+                                    border: copied ? '1px solid rgba(16,185,129,0.3)' : '1px solid rgba(16,185,129,0.25)',
+                                    color: copied ? '#10b981' : '#34d399', fontWeight: 700, fontSize: '0.82rem',
                                     display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', transition: 'all 0.2s',
                                 }}
                             >
@@ -129,7 +129,7 @@ export default function ProfilePage() {
                 ) : (
                     <div style={{ textAlign: 'center', padding: '20px 0' }}>
                         <p style={{ color: '#475569', fontSize: '0.875rem', marginBottom: '16px' }}>
-                            Go to <strong style={{ color: '#a78bfa' }}>Projects</strong> and click <strong style={{ color: '#a78bfa' }}>Connect Wallet</strong> to get started.
+                            Go to <strong style={{ color: '#10b981' }}>Projects</strong> and click <strong style={{ color: '#10b981' }}>Connect Wallet</strong> to get started.
                         </p>
                     </div>
                 )}
@@ -144,7 +144,7 @@ export default function ProfilePage() {
                     </h2>
                 </div>
                 {[
-                    'Your private key (WIF) is stored only in this browser\'s localStorage.',
+                    'Your private key is stored only in this browser\'s localStorage.',
                     'This is a TESTNET wallet. Never use real mainnet BCH here.',
                     'Clearing browser data will permanently delete your wallet.',
                     'The anon Supabase key is public — RLS policies protect your data.',

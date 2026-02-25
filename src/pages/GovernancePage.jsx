@@ -51,23 +51,23 @@ export default function GovernancePage() {
                 <div style={{
                     display: 'inline-flex', alignItems: 'center', gap: '8px',
                     padding: '4px 12px', borderRadius: '999px', marginBottom: '12px',
-                    background: 'rgba(139,92,246,0.1)', border: '1px solid rgba(139,92,246,0.25)',
+                    background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.25)',
                 }}>
-                    <span style={{ fontSize: '0.7rem', fontWeight: 700, color: '#a78bfa', letterSpacing: '0.06em' }}>WEEK 3 · CASHTOKENS</span>
+                    <span style={{ fontSize: '0.7rem', fontWeight: 700, color: '#10b981', letterSpacing: '0.06em' }}>BITCOIN CASH · CHIPNET</span>
                 </div>
                 <h1 style={{ fontSize: '1.75rem', fontWeight: 800, color: '#f1f5f9', letterSpacing: '-0.03em', marginBottom: '6px' }}>
                     Governance
                 </h1>
                 <p style={{ color: '#64748b', fontSize: '0.9rem' }}>
-                    Token-weighted milestone voting powered by CashTokens on Bitcoin Cash
+                    Token-weighted milestone voting powered by Cash Tokens on Bitcoin Cash Chipnet
                 </p>
             </div>
 
             {/* Stats row */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '16px', marginBottom: '28px' }}>
                 {[
-                    { label: 'GOV Tokens', value: '0', color: '#7c3aed' },
-                    { label: 'Votes Cast', value: '0', color: '#10b981' },
+                    { label: 'GOV Tokens', value: '0', color: '#10b981' },
+                    { label: 'Votes Cast', value: '0', color: '#34d399' },
                     { label: 'Approved', value: '0/0', color: '#06b6d4' },
                 ].map(({ label, value, color }) => (
                     <div key={label} style={{ background: 'rgba(15,17,35,0.85)', border: `1px solid ${color}20`, borderRadius: '14px', padding: '20px', backdropFilter: 'blur(20px)', textAlign: 'center' }}>
@@ -79,9 +79,9 @@ export default function GovernancePage() {
 
             {/* Info cards */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '28px' }}>
-                <InfoCard Icon={Coins} color="#7c3aed" title="How GOV Tokens Work" body="Lock BCH into a milestone contract → receive 100 GOV tokens per 0.001 BCH. Each token equals 1 vote on any active milestone." />
-                <InfoCard Icon={Vote} color="#10b981" title="Token-Weighted Voting" body="Cast votes using your GOV tokens. Tokens spent on voting are permanently consumed. If a milestone reaches >50% YES votes it is approved." />
-                <InfoCard Icon={Shield} color="#06b6d4" title="CashScript Smart Contracts" body="Funds are locked in a CashScript contract on Chipnet. Release only happens after milestone approval — the contract enforces the owner signature." />
+                <InfoCard Icon={Coins} color="#10b981" title="How GOV Tokens Work" body="Lock BCH into a milestone contract → receive 100 GOV tokens per 0.001 BCH. Each token equals 1 vote on any active milestone." />
+                <InfoCard Icon={Vote} color="#34d399" title="Token-Weighted Voting" body="Cast votes using your GOV tokens. Tokens allow you to influence which project milestones get funded next." />
+                <InfoCard Icon={Shield} color="#06b6d4" title="CashScript Smart Contracts" body="Funds are locked in a CashScript contract on Chipnet. Release only happens after milestone approval — the contract enforces standard Cash Token governance rules." />
             </div>
 
             {/* How to vote — step guide */}
@@ -92,10 +92,10 @@ export default function GovernancePage() {
                         How to Participate in Governance
                     </h2>
                 </div>
-                <Step num="1" text="Go to Projects → create or open a project" color="#7c3aed" />
-                <Step num="2" text='Connect your BCH wallet and click "Lock & Mint" to receive GOV tokens' color="#7c3aed" />
-                <Step num="3" text="Select how many tokens to use per vote (1, 5, 10, or 25)" color="#10b981" />
-                <Step num="4" text='Vote YES or NO on each milestone using your GOV tokens' color="#10b981" />
+                <Step num="1" text="Go to Projects → create or open a project" color="#10b981" />
+                <Step num="2" text='Connect your Chipnet wallet and click "Lock & Mint" to receive GOV tokens' color="#10b981" />
+                <Step num="3" text="Select how many tokens to use per vote (1, 5, 10, or 25)" color="#34d399" />
+                <Step num="4" text='Vote YES or NO on each milestone using your GOV tokens' color="#34d399" />
                 <Step num="5" text='Once >50% YES → Release Funds button appears → click to send BCH to project' color="#06b6d4" />
             </div>
         </div>

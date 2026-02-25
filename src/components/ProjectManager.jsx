@@ -8,7 +8,8 @@
  * 3. Handles loading, error, and empty states
  *
  * ── How to use ────────────────────────────────────────────────────────────────
- * Drop <ProjectManager walletAddress="bchtest:qp..." /> into any page.
+/**
+ * Drop <ProjectManager walletAddress="0x..." /> into any page.
  * The walletAddress prop is set as the owner_wallet of each new project.
  *
  * ── Dependencies ─────────────────────────────────────────────────────────────
@@ -21,7 +22,7 @@ import { Plus, FolderKanban, AlertCircle, Loader2, RefreshCw } from 'lucide-reac
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-const fmt = (n) => parseFloat(n || 0).toFixed(6)
+const fmt = (n) => parseFloat(n || 0).toFixed(8)
 const date = (s) => new Date(s).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
 
 const EMPTY_FORM = { title: '', description: '', goal_amount: '', owner_wallet: '' }
@@ -140,7 +141,7 @@ export default function ProjectManager({ walletAddress = '' }) {
                 borderRadius: '16px', padding: '28px', marginBottom: '28px',
             }}>
                 <h2 style={{ fontSize: '1.05rem', fontWeight: 800, marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <Plus size={18} color="#a78bfa" /> Create New Project
+                    <Plus size={18} color="#10b981" /> Create New Project
                 </h2>
 
                 <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
@@ -152,7 +153,7 @@ export default function ProjectManager({ walletAddress = '' }) {
                             name="title"
                             value={form.title}
                             onChange={handleChange}
-                            placeholder="e.g. BCH Community Hub"
+                            placeholder="e.g. Bitcoin Cash Community Hub"
                             required
                             style={inputStyle}
                         />
@@ -194,7 +195,7 @@ export default function ProjectManager({ walletAddress = '' }) {
                             name="owner_wallet"
                             value={form.owner_wallet}
                             onChange={handleChange}
-                            placeholder="bchtest:qp..."
+                            placeholder="bchtest:..."
                             required
                             style={{ ...inputStyle, fontFamily: 'monospace', fontSize: '0.8rem' }}
                         />
@@ -217,11 +218,11 @@ export default function ProjectManager({ walletAddress = '' }) {
                         disabled={submitting}
                         style={{
                             padding: '12px', borderRadius: '10px', border: 'none', cursor: submitting ? 'not-allowed' : 'pointer',
-                            background: 'linear-gradient(135deg,#7c3aed,#4f46e5)', color: '#fff',
+                            background: 'linear-gradient(135deg, #10b981, #059669)', color: '#fff',
                             fontWeight: 700, fontSize: '0.9rem', display: 'flex', alignItems: 'center',
                             justifyContent: 'center', gap: '8px',
                             opacity: submitting ? 0.7 : 1, transition: 'all 0.2s',
-                            boxShadow: '0 0 20px rgba(124,58,237,0.25)',
+                            boxShadow: '0 0 20px rgba(16,185,129,0.25)',
                         }}
                     >
                         {submitting
@@ -241,11 +242,11 @@ export default function ProjectManager({ walletAddress = '' }) {
                 {/* Header */}
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
                     <h2 style={{ fontSize: '1.05rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
-                        <FolderKanban size={18} color="#a78bfa" />
+                        <FolderKanban size={18} color="#10b981" />
                         All Projects
                         <span style={{
                             fontSize: '0.72rem', fontWeight: 700, padding: '2px 10px', borderRadius: '999px',
-                            background: 'rgba(124,58,237,0.1)', border: '1px solid rgba(124,58,237,0.2)', color: '#a78bfa',
+                            background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.2)', color: '#34d399',
                         }}>
                             {loading ? '…' : projects.length}
                         </span>
@@ -327,7 +328,7 @@ export default function ProjectManager({ walletAddress = '' }) {
                                             background: i % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.015)',
                                             transition: 'background 0.15s',
                                         }}
-                                        onMouseEnter={e => e.currentTarget.style.background = 'rgba(124,58,237,0.06)'}
+                                        onMouseEnter={e => e.currentTarget.style.background = 'rgba(16,185,129,0.06)'}
                                         onMouseLeave={e => e.currentTarget.style.background = i % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.015)'}
                                     >
                                         <td style={tdStyle}>
@@ -365,9 +366,9 @@ export default function ProjectManager({ walletAddress = '' }) {
 
 function StatusBadge({ status }) {
     const map = {
-        active: { bg: 'rgba(16,185,129,0.1)', border: 'rgba(16,185,129,0.3)', color: '#10b981' },
-        funded: { bg: 'rgba(6,182,212,0.1)', border: 'rgba(6,182,212,0.3)', color: '#06b6d4' },
-        completed: { bg: 'rgba(139,92,246,0.1)', border: 'rgba(139,92,246,0.3)', color: '#a78bfa' },
+        active: { bg: 'rgba(16,185,129,0.1)', border: 'rgba(16,185,129,0.3)', color: '#34d399' },
+        funded: { bg: 'rgba(5,150,105,0.1)', border: 'rgba(5,150,105,0.3)', color: '#10b981' },
+        completed: { bg: 'rgba(6,182,212,0.1)', border: 'rgba(6,182,212,0.3)', color: '#06b6d4' },
         cancelled: { bg: 'rgba(239,68,68,0.08)', border: 'rgba(239,68,68,0.2)', color: '#f87171' },
     }
     const s = map[status] ?? map.active

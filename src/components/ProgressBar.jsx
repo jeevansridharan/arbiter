@@ -8,14 +8,14 @@ export default function ProgressBar({ current, target }) {
         <div>
             <div className="flex items-center justify-between mb-2">
                 <span className="text-sm font-semibold text-slate-300">Funding Progress</span>
-                <span className="text-sm font-bold" style={{ color: percentage >= 100 ? '#10b981' : '#a78bfa' }}>
+                <span className="text-sm font-bold" style={{ color: percentage >= 100 ? '#10b981' : '#34d399' }}>
                     {displayPct}%
                 </span>
             </div>
-            <div className="progress-track">
+            <div className="progress-track" style={{ background: 'rgba(255,255,255,0.06)', borderRadius: '999px', height: '8px', overflow: 'hidden' }}>
                 <div
                     className="progress-fill"
-                    style={{ width: `${percentage}%` }}
+                    style={{ width: `${percentage}%`, background: 'linear-gradient(90deg, #10b981, #06b6d4)', height: '100%', borderRadius: '999px', transition: 'width 0.6s ease' }}
                     role="progressbar"
                     aria-valuenow={percentage}
                     aria-valuemin="0"
@@ -23,8 +23,8 @@ export default function ProgressBar({ current, target }) {
                 />
             </div>
             <div className="flex justify-between mt-2 text-xs text-slate-500">
-                <span>{current.toFixed(4)} BCH raised</span>
-                <span>Goal: {target.toFixed(4)} BCH</span>
+                <span>{current.toFixed(8)} BCH raised</span>
+                <span>Goal: {target.toFixed(8)} BCH</span>
             </div>
         </div>
     )

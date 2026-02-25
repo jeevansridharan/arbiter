@@ -29,14 +29,12 @@ function requireSupabase() {
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
- * insertTransaction({ projectId, txHash, amount, type })
- *
  * Records a BCH on-chain transaction in the Supabase database.
- * Call this AFTER a successful wallet.send() on Chipnet.
+ * Call this AFTER a successful broadcast on Chipnet.
  *
  * @param {object} params
  * @param {string} params.projectId  UUID of the project
- * @param {string} params.txHash     Chipnet transaction ID (64-char hex)
+ * @param {string} params.txHash     Chipnet transaction hash
  * @param {number} params.amount     BCH amount (e.g. 0.001)
  * @param {'funding'|'release'|'refund'} params.type  Type of transaction
  * @returns {Promise<Transaction>}
@@ -104,7 +102,7 @@ export async function fetchTransactionsByProject(projectId) {
  * getProjectFundingTotal(projectId)
  *
  * Returns the SUM of all 'funding' type transactions for a project.
- * Use this as the source of truth for how much BCH has been received on-chain.
+ * Use this as the source of truth for how much ETH has been received on-chain.
  *
  * @param   {string} projectId
  * @returns {Promise<number>}   Total BCH funded (e.g. 0.025)

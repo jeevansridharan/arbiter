@@ -1,12 +1,11 @@
 /**
  * WalletPanel.jsx
  *
- * Handles the full wallet UX for Milestara Week 2:
+ * Handles the full wallet UX for Chipnet:
  *  - Connect / Generate Chipnet wallet
  *  - Display address + live balance
  *  - Fund project form (amount input + send button)
  *  - Transaction hash display + explorer link
- *  - Error handling + loading states
  */
 
 import React, { useState, useCallback } from 'react'
@@ -15,10 +14,11 @@ import {
     getBalance,
     fundProject,
     disconnectWallet,
-    getChipnetExplorerUrl,
+    getExplorerUrl,
     shortenAddress,
     PROJECT_ADDRESS,
 } from '../services/bchWallet'
+import { QRCodeCanvas } from 'qrcode.react'
 
 // ── Status icon helpers ─────────────────────────────────────────────────────
 function Spinner() {
@@ -42,17 +42,19 @@ export default function WalletPanel({ onRealFund, onWalletConnect }) {
     const [balanceLoading, setBalanceLoading] = useState(false)
     const [sendLoading, setSendLoading] = useState(false)
     const [txStatus, setTxStatus] = useState('idle') // 'idle'|'sending'|'success'|'error'
+    const [showQr, setShowQr] = useState(false)
 
     // ── Helpers ───────────────────────────────────────────────────────────────
     const clearError = () => setError('')
 
     const refreshBalance = useCallback(async (w) => {
+        if (!w && !wallet) return
         setBalanceLoading(true)
         try {
             const bal = await getBalance(w ?? wallet)
             setBalance(bal)
         } catch (e) {
-            setError('Could not fetch balance. Check your network.')
+            setError('Could not fetch balance. Check Chipnet connection.')
         } finally {
             setBalanceLoading(false)
         }
@@ -67,7 +69,6 @@ export default function WalletPanel({ onRealFund, onWalletConnect }) {
             setWallet(w)
             setAddress(w.cashaddr)
             await refreshBalance(w)
-            // Week 3: expose wallet to parent so GovernancePanel can use it
             if (onWalletConnect) onWalletConnect(w)
         } catch (e) {
             console.error(e)
@@ -87,7 +88,6 @@ export default function WalletPanel({ onRealFund, onWalletConnect }) {
         setTxId('')
         setTxStatus('idle')
         clearError()
-        // Week 3: notify parent wallet is gone
         if (onWalletConnect) onWalletConnect(null)
     }
 
@@ -100,7 +100,7 @@ export default function WalletPanel({ onRealFund, onWalletConnect }) {
             return
         }
         if (balance !== null && parsed > balance) {
-            setError(`Insufficient balance. You have ${balance.toFixed(6)} BCH.`)
+            setError(`Insufficient balance. You have ${balance.toFixed(8)} BCH.`)
             return
         }
 
@@ -112,14 +112,12 @@ export default function WalletPanel({ onRealFund, onWalletConnect }) {
             const hash = await fundProject(wallet, parsed)
             setTxId(hash)
             setTxStatus('success')
-            // Notify parent so the dashboard funded amount also updates
             if (onRealFund) onRealFund(parsed)
-            // Refresh balance after sending
             await refreshBalance()
         } catch (e) {
             console.error(e)
             setTxStatus('error')
-            setError(e.message || 'Transaction failed. See console for details.')
+            setError(e.message || 'Transaction failed.')
         } finally {
             setSendLoading(false)
         }
@@ -133,26 +131,19 @@ export default function WalletPanel({ onRealFund, onWalletConnect }) {
         setTimeout(() => setCopied(false), 2000)
     }
 
-    // ════════════════════════════════════════════════════════════════════════════
-    // RENDER — NOT CONNECTED
-    // ════════════════════════════════════════════════════════════════════════════
     if (!wallet) {
         return (
             <div className="card-glass rounded-2xl p-6 mb-6">
-                {/* Header */}
                 <div className="flex items-center gap-3 mb-5">
-                    <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: 'rgba(139,92,246,0.15)', border: '1px solid rgba(139,92,246,0.3)' }}>
+                    <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: 'rgba(16,185,129,0.15)', border: '1px solid rgba(16,185,129,0.3)' }}>
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-                            <rect x="2" y="7" width="20" height="14" rx="3" stroke="#a78bfa" strokeWidth="2" />
-                            <path d="M16 14a1 1 0 1 1-2 0 1 1 0 0 1 2 0z" fill="#a78bfa" />
-                            <path d="M2 11h20" stroke="#a78bfa" strokeWidth="2" />
+                            <path d="M12 2L3 12L12 22L21 12L12 2Z" stroke="#10b981" strokeWidth="2" />
                         </svg>
                     </div>
                     <div>
-                        <h2 className="text-white font-bold text-base">BCH Wallet</h2>
+                        <h2 className="text-white font-bold text-base">Bitcoin Cash Wallet</h2>
                         <p className="text-slate-500 text-xs">Chipnet (Testnet)</p>
                     </div>
-                    {/* Not connected dot */}
                     <div className="ml-auto flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold" style={{ background: 'rgba(100,116,139,0.12)', border: '1px solid rgba(100,116,139,0.2)', color: '#94a3b8' }}>
                         <div className="w-1.5 h-1.5 rounded-full bg-slate-500"></div>
                         Not connected
@@ -160,7 +151,7 @@ export default function WalletPanel({ onRealFund, onWalletConnect }) {
                 </div>
 
                 <p className="text-slate-400 text-sm mb-5 leading-relaxed">
-                    Connect a Chipnet wallet to send real BCH test transactions to the project address.
+                    Connect a Chipnet wallet to send BCH test transactions to the project address.
                     A new wallet is auto-generated and saved in your browser.
                 </p>
 
@@ -168,13 +159,13 @@ export default function WalletPanel({ onRealFund, onWalletConnect }) {
                     id="connect-wallet-btn"
                     onClick={handleConnect}
                     disabled={connectLoading}
-                    className="w-full py-3.5 rounded-xl font-bold text-white gradient-btn flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
+                    className="w-full py-3.5 rounded-xl font-bold text-white gradient-btn-green flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
                 >
                     {connectLoading ? (
                         <><Spinner /> Generating Chipnet Wallet…</>
                     ) : (
                         <>
-                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><rect x="2" y="7" width="20" height="14" rx="3" stroke="currentColor" strokeWidth="2" /><path d="M16 14a1 1 0 1 1-2 0 1 1 0 0 1 2 0z" fill="currentColor" /><path d="M2 11h20" stroke="currentColor" strokeWidth="2" /></svg>
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M12 2L3 12L12 22L21 12L12 2Z" stroke="currentColor" strokeWidth="2" /></svg>
                             Connect Wallet
                         </>
                     )}
@@ -185,55 +176,88 @@ export default function WalletPanel({ onRealFund, onWalletConnect }) {
         )
     }
 
-    // ════════════════════════════════════════════════════════════════════════════
-    // RENDER — CONNECTED
-    // ════════════════════════════════════════════════════════════════════════════
     return (
         <div className="card-glass rounded-2xl p-6 mb-6">
-            {/* ── Header row ───────────────────────────────────────────────────── */}
             <div className="flex items-center gap-3 mb-5">
                 <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: 'rgba(16,185,129,0.15)', border: '1px solid rgba(16,185,129,0.3)' }}>
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-                        <rect x="2" y="7" width="20" height="14" rx="3" stroke="#10b981" strokeWidth="2" />
-                        <path d="M16 14a1 1 0 1 1-2 0 1 1 0 0 1 2 0z" fill="#10b981" />
-                        <path d="M2 11h20" stroke="#10b981" strokeWidth="2" />
+                        <path d="M12 2L3 12L12 22L21 12L12 2Z" stroke="#10b981" strokeWidth="2" />
                     </svg>
                 </div>
                 <div>
-                    <h2 className="text-white font-bold text-base">BCH Wallet</h2>
+                    <h2 className="text-white font-bold text-base">Bitcoin Cash Wallet</h2>
                     <p className="text-slate-500 text-xs">Chipnet (Testnet)</p>
                 </div>
-                {/* Connected dot */}
                 <div className="ml-auto flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold" style={{ background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.25)', color: '#10b981' }}>
                     <div className="w-1.5 h-1.5 rounded-full bg-emerald-400" style={{ boxShadow: '0 0 5px rgba(52,211,153,0.9)' }}></div>
                     Connected
                 </div>
             </div>
 
-            {/* ── Wallet address ───────────────────────────────────────────────── */}
             <div className="rounded-xl p-4 mb-4" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
                 <div className="flex items-center justify-between mb-1">
                     <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Your Chipnet Address</span>
-                    <button
-                        onClick={handleCopy}
-                        className="text-xs font-medium transition-colors px-2 py-0.5 rounded-md"
-                        style={{ color: copied ? '#10b981' : '#a78bfa', background: copied ? 'rgba(16,185,129,0.1)' : 'rgba(139,92,246,0.1)' }}
-                    >
-                        {copied ? '✓ Copied' : 'Copy'}
-                    </button>
+                    <div className="flex gap-2">
+                        <button
+                            onClick={() => setShowQr(!showQr)}
+                            className="text-xs font-medium transition-colors px-2 py-0.5 rounded-md"
+                            style={{ color: '#10b981', background: 'rgba(16,185,129,0.1)' }}
+                        >
+                            {showQr ? 'Close QR' : 'Show QR'}
+                        </button>
+                        <button
+                            onClick={handleCopy}
+                            className="text-xs font-medium transition-colors px-2 py-0.5 rounded-md"
+                            style={{ color: copied ? '#10b981' : '#34d399', background: copied ? 'rgba(16,185,129,0.1)' : 'rgba(16,185,129,0.15)' }}
+                        >
+                            {copied ? '✓ Copied' : 'Copy'}
+                        </button>
+                    </div>
                 </div>
                 <p className="text-slate-300 text-sm font-mono break-all leading-relaxed">{address}</p>
+
+                {showQr && (
+                    <div className="mt-4 p-4 bg-white rounded-xl flex flex-col items-center gap-3">
+                        <QRCodeCanvas
+                            value={address}
+                            size={180}
+                            level="H"
+                            includeMargin={true}
+                            imageSettings={{
+                                src: "https://cryptologos.cc/logos/bitcoin-cash-bch-logo.svg",
+                                x: undefined,
+                                y: undefined,
+                                height: 30,
+                                width: 30,
+                                excavate: true,
+                            }}
+                        />
+                        <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest text-center">
+                            Scan with Paytaca, Zapit, or Cashonize
+                        </p>
+                        <div className="flex gap-4 mt-2">
+                            <a href="https://cashonize.com" target="_blank" rel="noreferrer" title="Cashonize">
+                                <img src="https://cashonize.com/favicon.ico" className="w-6 h-6 rounded-full grayscale hover:grayscale-0 transition-all" alt="Cashonize" />
+                            </a>
+                            <a href="https://paytaca.com" target="_blank" rel="noreferrer" title="Paytaca">
+                                <img src="https://www.paytaca.com/img/favicon.png" className="w-6 h-6 rounded-md grayscale hover:grayscale-0 transition-all" alt="Paytaca" />
+                            </a>
+                            <a href="https://zapit.io" target="_blank" rel="noreferrer" title="Zapit">
+                                <img src="https://www.zapit.io/favicon.ico" className="w-6 h-6 rounded-md grayscale hover:grayscale-0 transition-all" alt="Zapit" />
+                            </a>
+                        </div>
+                    </div>
+                )}
             </div>
 
-            {/* ── Balance row ──────────────────────────────────────────────────── */}
             <div className="flex items-center justify-between rounded-xl p-4 mb-5" style={{ background: 'rgba(16,185,129,0.07)', border: '1px solid rgba(16,185,129,0.15)' }}>
                 <div>
                     <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-0.5">Balance</p>
                     {balanceLoading ? (
                         <div className="flex items-center gap-2 text-slate-400"><Spinner /> Fetching…</div>
                     ) : balance !== null ? (
-                        <p className="text-xl font-bold" style={{ color: '#4ade80' }}>
-                            {balance.toFixed(6)} <span className="text-sm font-semibold text-emerald-400">BCH</span>
+                        <p className="text-xl font-bold" style={{ color: '#34d399' }}>
+                            {balance.toFixed(8)} <span className="text-sm font-semibold text-emerald-400">BCH</span>
                         </p>
                     ) : (
                         <p className="text-slate-500 text-sm">Unknown</p>
@@ -254,38 +278,46 @@ export default function WalletPanel({ onRealFund, onWalletConnect }) {
                 </button>
             </div>
 
-            {/* ── Faucet hint ──────────────────────────────────────────────────── */}
             {balance !== null && balance === 0 && (
                 <div className="rounded-xl p-3 mb-4 flex items-start gap-3" style={{ background: 'rgba(251,191,36,0.08)', border: '1px solid rgba(251,191,36,0.2)' }}>
                     <span className="text-lg">💡</span>
-                    <div>
-                        <p className="text-yellow-400 text-xs font-semibold mb-0.5">Your balance is zero!</p>
-                        <p className="text-slate-400 text-xs">
-                            Get free Chipnet tBCH from the faucet:{' '}
-                            <a href="https://tbch.googol.cash/" target="_blank" rel="noreferrer" className="underline" style={{ color: '#fbbf24' }}>
-                                tbch.googol.cash
+                    <div className="flex-1">
+                        <p className="text-yellow-400 text-xs font-semibold mb-2">Your balance is zero — get free Chipnet BCH!</p>
+                        <div className="flex flex-col gap-1.5">
+                            <a href="https://faucet.paytaca.com" target="_blank" rel="noreferrer"
+                                className="flex items-center gap-2 text-xs font-semibold px-2 py-1.5 rounded-lg transition-all"
+                                style={{ background: 'rgba(251,191,36,0.12)', color: '#fbbf24', border: '1px solid rgba(251,191,36,0.2)' }}>
+                                <span>🟡</span>
+                                <span>faucet.paytaca.com</span>
+                                <span className="ml-auto text-[9px] font-bold px-1.5 py-0.5 rounded" style={{ background: 'rgba(16,185,129,0.15)', color: '#10b981' }}>✓ LIVE</span>
                             </a>
-                        </p>
+                            <a href="https://tbch.googol.cash" target="_blank" rel="noreferrer"
+                                className="flex items-center gap-2 text-xs font-semibold px-2 py-1.5 rounded-lg transition-all"
+                                style={{ background: 'rgba(251,191,36,0.12)', color: '#fbbf24', border: '1px solid rgba(251,191,36,0.2)' }}>
+                                <span>⚡</span>
+                                <span>tbch.googol.cash</span>
+                                <span className="ml-auto text-[9px] font-bold px-1.5 py-0.5 rounded" style={{ background: 'rgba(16,185,129,0.15)', color: '#10b981' }}>✓ LIVE</span>
+                            </a>
+                        </div>
+                        <p className="text-slate-500 text-[10px] mt-2">Paste your address → request coins → wait ~1 min ✓</p>
                     </div>
                 </div>
             )}
 
-            {/* ── Project address display ──────────────────────────────────────── */}
-            <div className="rounded-xl p-3 mb-5" style={{ background: 'rgba(139,92,246,0.06)', border: '1px solid rgba(139,92,246,0.15)' }}>
+            <div className="rounded-xl p-3 mb-5" style={{ background: 'rgba(16,185,129,0.06)', border: '1px solid rgba(16,185,129,0.15)' }}>
                 <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Sending to Project</p>
-                <p className="text-violet-300 text-xs font-mono break-all">
+                <p className="text-emerald-300 text-xs font-mono break-all">
                     {PROJECT_ADDRESS}
                 </p>
             </div>
 
-            {/* ── Amount input + Send ──────────────────────────────────────────── */}
             <div className="space-y-3">
                 <div className="relative">
                     <input
                         id="fund-amount-input"
                         type="number"
-                        min="0.00001"
-                        step="0.0001"
+                        min="0.0001"
+                        step="0.001"
                         value={amount}
                         onChange={(e) => { setAmount(e.target.value); clearError(); setTxStatus('idle'); setTxId('') }}
                         placeholder="0.0100"
@@ -295,14 +327,13 @@ export default function WalletPanel({ onRealFund, onWalletConnect }) {
                     <span className="absolute right-4 top-1/2 -translate-y-1/2 text-sm font-bold" style={{ color: '#10b981' }}>BCH</span>
                 </div>
 
-                {/* Quick-amount buttons */}
                 <div className="flex gap-2">
                     {['0.001', '0.005', '0.01', '0.05'].map((v) => (
                         <button
                             key={v}
                             onClick={() => { setAmount(v); clearError(); setTxStatus('idle'); setTxId('') }}
                             className="flex-1 py-1.5 rounded-lg text-xs font-semibold transition-all"
-                            style={{ background: 'rgba(139,92,246,0.1)', border: '1px solid rgba(139,92,246,0.2)', color: '#a78bfa' }}
+                            style={{ background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.2)', color: '#10b981' }}
                         >
                             {v}
                         </button>
@@ -326,15 +357,12 @@ export default function WalletPanel({ onRealFund, onWalletConnect }) {
                 </button>
             </div>
 
-            {/* ── Error ────────────────────────────────────────────────────────── */}
             {error && <ErrorBox message={error} onClose={clearError} />}
 
-            {/* ── Transaction Result ────────────────────────────────────────────── */}
             {txStatus === 'success' && txId && (
                 <TxSuccess txId={txId} amount={amount} />
             )}
 
-            {/* ── Disconnect ───────────────────────────────────────────────────── */}
             <div className="mt-5 pt-4" style={{ borderTop: '1px solid rgba(255,255,255,0.05)' }}>
                 <button
                     id="disconnect-wallet-btn"
@@ -361,7 +389,7 @@ function ErrorBox({ message, onClose }) {
 }
 
 function TxSuccess({ txId, amount }) {
-    const url = getChipnetExplorerUrl(txId)
+    const url = getExplorerUrl(txId)
     return (
         <div className="mt-4 p-4 rounded-xl" style={{ background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.3)' }}>
             <div className="flex items-center gap-2 mb-2">
@@ -369,9 +397,9 @@ function TxSuccess({ txId, amount }) {
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="#10b981" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
                 </div>
                 <span className="text-emerald-400 font-bold text-sm">Transaction Sent!</span>
-                <span className="text-slate-400 text-xs ml-auto">{parseFloat(amount).toFixed(6)} BCH</span>
+                <span className="text-slate-400 text-xs ml-auto">{parseFloat(amount).toFixed(8)} BCH</span>
             </div>
-            <p className="text-xs text-slate-500 mb-1 font-semibold uppercase tracking-wider">Transaction ID</p>
+            <p className="text-xs text-slate-500 mb-1 font-semibold uppercase tracking-wider">Transaction Hash</p>
             <p className="text-slate-300 text-xs font-mono break-all mb-3">{txId}</p>
             <a
                 href={url}
@@ -381,7 +409,7 @@ function TxSuccess({ txId, amount }) {
                 className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors"
                 style={{ background: 'rgba(16,185,129,0.15)', color: '#10b981', border: '1px solid rgba(16,185,129,0.3)' }}
             >
-                View on Chipnet Explorer
+                View on Explorer
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6M15 3h6v6M10 14L21 3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
             </a>
         </div>

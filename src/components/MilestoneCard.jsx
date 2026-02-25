@@ -18,8 +18,8 @@ export default function MilestoneCard({ milestone, index, onVote }) {
                         style={{
                             background: isApproved
                                 ? 'rgba(16,185,129,0.2)'
-                                : 'rgba(139,92,246,0.2)',
-                            color: isApproved ? '#10b981' : '#a78bfa',
+                                : 'rgba(52,211,153,0.15)',
+                            color: isApproved ? '#10b981' : '#34d399',
                         }}
                     >
                         {isApproved ? '✓' : index + 1}
@@ -46,7 +46,7 @@ export default function MilestoneCard({ milestone, index, onVote }) {
                     <div className="flex rounded-full overflow-hidden h-2 mb-1.5" style={{ background: 'rgba(255,255,255,0.05)' }}>
                         <div
                             className="h-full transition-all duration-500"
-                            style={{ width: `${yesPercent}%`, background: 'linear-gradient(90deg, #059669, #10b981)' }}
+                            style={{ width: `${yesPercent}%`, background: 'linear-gradient(90deg, #10b981, #059669)' }}
                         />
                         <div
                             className="h-full transition-all duration-500"
@@ -65,7 +65,8 @@ export default function MilestoneCard({ milestone, index, onVote }) {
                 <button
                     id={`vote-yes-${index}`}
                     onClick={() => onVote(milestone.id, 'yes')}
-                    className="flex-1 py-2.5 rounded-xl font-semibold text-sm text-white gradient-btn-green flex items-center justify-center gap-2"
+                    className="flex-1 py-2.5 rounded-xl font-semibold text-sm text-white flex items-center justify-center gap-2"
+                    style={{ background: 'linear-gradient(135deg, #10b981, #059669)', border: 'none', cursor: 'pointer' }}
                 >
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M7 10l5-5 5 5M7 15l5-5 5 5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
                     Yes
@@ -77,7 +78,8 @@ export default function MilestoneCard({ milestone, index, onVote }) {
                 <button
                     id={`vote-no-${index}`}
                     onClick={() => onVote(milestone.id, 'no')}
-                    className="flex-1 py-2.5 rounded-xl font-semibold text-sm text-white gradient-btn-red flex items-center justify-center gap-2"
+                    className="flex-1 py-2.5 rounded-xl font-semibold text-sm text-white flex items-center justify-center gap-2"
+                    style={{ background: 'linear-gradient(135deg, #f43f5e, #e11d48)', border: 'none', cursor: 'pointer' }}
                 >
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M7 9l5 5 5-5M7 14l5 5 5-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
                     No
