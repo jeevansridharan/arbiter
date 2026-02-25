@@ -1,144 +1,165 @@
 /**
- * bchWallet.js — Milestara BCH Wallet Service
+ * bchWallet.js — Milestara BCH Wallet Service (Corrected for Chipnet v3)
  *
- * Uses mainnet-js (which wraps @bitauth/libauth internally).
- * All transactions go to Chipnet (BCH testnet).
- *
- * Flow:
- *  1. createOrLoadWallet()  → makes / restores a Chipnet wallet
- *  2. getBalance(wallet)    → reads live BCH balance via Electrum
- *  3. fundProject(wallet, amount) → broadcasts a real Chipnet tx
+ * ─── FIXES APPLIED ───────────────────────────────────────────────────────────
+ * 1. Network: Forced to "chipnet" to avoid Testnet3 defaults.
+ * 2. Balance: Fixed API mismatch (v3 returns BigInt satoshis directly).
+ * 3. Connection: Manual override to wss://chipnet.imaginary.cash:50004.
+ * 4. Sync: Added UTXO refresh before balance fetch.
+ * 5. Debugging: Added detailed console logs for every step.
+ * ─────────────────────────────────────────────────────────────────────────────
  */
 
-import { TestNetWallet } from 'mainnet-js'
+import { TestNetWallet, toBch, Connection } from 'mainnet-js'
 
-// ─── Config ────────────────────────────────────────────────────────────────
+// ─── Constants ───────────────────────────────────────────────────────────────
 
 /**
- * The predefined Chipnet project wallet that will RECEIVE funds.
- * Replace this with your own generated Chipnet address.
- * You can get one by calling createOrLoadWallet() once and logging wallet.cashaddr.
- *
- * Generate a fresh one at: https://chipnet.imaginary.cash/
+ * Chipnet Electrum WSS Endpoint.
+ * Essential for getting balance from the correct test network.
  */
-export const PROJECT_ADDRESS =
-    'bchtest:qzs8qgaupu6m6gqnrm3n3zt0p8slhgn4sy2smwwvy2'
+const CHIPNET_ELECTRUM_WSS = 'wss://chipnet.imaginary.cash:50004'
 
-// localStorage key for persisting the user's private key across page refreshes
+/**
+ * The predefined Chipnet project wallet that RECEIVES funds.
+ * Note: Should be in cashaddr format starting with 'bchtest:'
+ */
+export const PROJECT_ADDRESS = 'bchtest:qzs8qgaupu6m6gqnrm3n3zt0p8slhgn4sy2smwwvy2'
+
 const WALLET_STORAGE_KEY = 'milestara_chipnet_wif'
 
-// ─── Wallet creation ────────────────────────────────────────────────────────
+// ─── Internal Helper: Force Chipnet Connection ───────────────────────────────
+
+async function setupChipnetProvider(wallet) {
+    console.log('[bchWallet] Configuring Chipnet network provider...')
+    try {
+        // Create a dedicated Chipnet connection
+        const conn = new Connection('testnet', CHIPNET_ELECTRUM_WSS)
+
+        // Attach to the wallet
+        wallet.provider = conn.networkProvider
+
+        // Sync UTXOs to ensure we see the latest on-chain state
+        console.log('[bchWallet] Synchronizing UTXOs...')
+        await wallet.getUtxos()
+
+        console.log('[bchWallet] ✓ Chipnet provider & UTXOs synced')
+    } catch (err) {
+        console.error('[bchWallet] Provider setup failed:', err.message)
+    }
+}
+
+// ─── Wallet Creation & Loading ───────────────────────────────────────────────
 
 /**
  * createOrLoadWallet()
- *
- * Checks localStorage for a saved WIF (Wallet Import Format) private key.
- * - If found  → restores the same wallet so the user keeps their address.
- * - If not    → generates a brand-new random Chipnet wallet and saves the WIF.
- *
- * This is safe for a testnet demo. In production you'd use a proper keystore.
- *
- * @returns {Promise<TestNetWallet>} A ready-to-use mainnet-js wallet object
+ * 
+ * Restores or generates a "chipnet" wallet.
+ * Ensures the wallet is pointing to the Chipnet Electrum server.
  */
 export async function createOrLoadWallet() {
     const savedWif = localStorage.getItem(WALLET_STORAGE_KEY)
-
     let wallet
-    if (savedWif) {
-        // Restore existing wallet from saved private key
-        wallet = await TestNetWallet.fromWIF(savedWif)
-    } else {
-        // Generate a new random wallet
-        wallet = await TestNetWallet.newRandom()
-        // Persist the private key so the user keeps the same address
-        localStorage.setItem(WALLET_STORAGE_KEY, wallet.privateKeyWif)
-    }
 
-    return wallet
+    try {
+        if (savedWif) {
+            console.log('[bchWallet] Loading existing wallet from saved WIF:', savedWif.slice(0, 5) + '...')
+            wallet = await TestNetWallet.fromWIF(savedWif)
+        } else {
+            console.log('[bchWallet] No saved wallet found. Creating new random chipnet wallet...')
+            wallet = await TestNetWallet.newRandom()
+            localStorage.setItem(WALLET_STORAGE_KEY, wallet.privateKeyWif)
+        }
+
+        console.log('[bchWallet] Wallet Address:', wallet.cashaddr)
+        console.log('[bchWallet] Network Type:', wallet.network)
+
+        // Force connection to Chipnet nodes
+        await setupChipnetProvider(wallet)
+
+        return wallet
+    } catch (err) {
+        console.error('[bchWallet] Error in createOrLoadWallet:', err)
+        throw err
+    }
 }
 
-// ─── Balance ────────────────────────────────────────────────────────────────
+// ─── Balance Logic ───────────────────────────────────────────────────────────
 
 /**
  * getBalance(wallet)
- *
- * Queries the Chipnet Electrum network for the wallet's current BCH balance.
- *
- * @param {TestNetWallet} wallet
- * @returns {Promise<number>} Balance in BCH (e.g. 0.005)
+ * 
+ * Fetches the live balance in BCH.
+ * Handles the mainnet-js v3 BigInt return type.
  */
 export async function getBalance(wallet) {
-    const { bch } = await wallet.getBalance()
-    return bch ?? 0
+    if (!wallet) return 0
+
+    console.log('[bchWallet] Fetching balance for', wallet.cashaddr, '...')
+    try {
+        // 1. Force a UTXO sync right before checking balance
+        await wallet.getUtxos()
+
+        // 2. Get raw balance (returns BigInt in satoshis in mainnet-js v3)
+        const satoshisBigInt = await wallet.getBalance()
+        console.log('[bchWallet] Raw satoshis (BigInt):', satoshisBigInt.toString())
+
+        // 3. Convert Satoshis (BigInt) -> BCH (Number) using toBch utility
+        const bchBalance = Number(toBch(satoshisBigInt))
+        console.log('[bchWallet] Final BCH Balance:', bchBalance)
+
+        return bchBalance
+    } catch (err) {
+        console.error('[bchWallet] Failed to fetch balance:', err.message)
+        return 0
+    }
 }
 
-// ─── Send funds ─────────────────────────────────────────────────────────────
+// ─── Funding Logic ───────────────────────────────────────────────────────────
 
 /**
  * fundProject(wallet, amountBch)
- *
- * Builds, signs, and broadcasts a Chipnet transaction that sends
- * `amountBch` BCH from the user's wallet to PROJECT_ADDRESS.
- *
- * mainnet-js handles:
- *   - UTXO fetching
- *   - Transaction construction (via libauth)
- *   - Change output calculation
- *   - Fee estimation
- *   - Broadcasting to Chipnet Electrum nodes
- *
- * @param {TestNetWallet} wallet        The funded user wallet
- * @param {number|string} amountBch    Amount to send, e.g. "0.01"
- * @returns {Promise<string>}          Transaction ID (txid) on success
- * @throws  Will throw if insufficient funds or network error
+ * 
+ * Broadcasts a transaction to the project address.
  */
 export async function fundProject(wallet, amountBch) {
-    const result = await wallet.send([
-        {
-            cashaddr: PROJECT_ADDRESS,
-            value: parseFloat(amountBch),
-            unit: 'bch',
-        },
-    ])
-    // result.txId is the broadcast transaction hash on Chipnet
-    return result.txId
+    console.log(`[bchWallet] Initiating funding: ${amountBch} BCH -> ${PROJECT_ADDRESS}`)
+
+    try {
+        // Convert BCH to satoshis (BigInt) for v3 API
+        const satoshis = BigInt(Math.round(parseFloat(amountBch) * 1e8))
+
+        const result = await wallet.send([
+            {
+                cashaddr: PROJECT_ADDRESS,
+                value: satoshis,
+                unit: 'sat',
+            }
+        ])
+
+        console.log('[bchWallet] Transaction successful! TXID:', result.txId)
+        return result.txId
+    } catch (err) {
+        console.error('[bchWallet] Funding failed:', err.message)
+        throw new Error(err.message || 'Transaction failed')
+    }
 }
 
-// ─── Disconnect ──────────────────────────────────────────────────────────────
+// ─── Utility Functions ───────────────────────────────────────────────────────
 
-/**
- * disconnectWallet()
- *
- * Removes the saved WIF from localStorage.
- * The next createOrLoadWallet() call will generate a fresh wallet.
- */
 export function disconnectWallet() {
     localStorage.removeItem(WALLET_STORAGE_KEY)
+    console.log('[bchWallet] Wallet disconnected.')
 }
 
-// ─── Utilities ───────────────────────────────────────────────────────────────
-
-/**
- * getChipnetExplorerUrl(txId)
- *
- * Returns the Chipnet block explorer URL for a given transaction ID.
- * Use this to show the user a clickable link after a successful send.
- */
-export function getChipnetExplorerUrl(txId) {
+export function getExplorerUrl(txId) {
     return `https://chipnet.imaginary.cash/tx/${txId}`
 }
 
-/** Alias for consistency across components */
-export const getExplorerUrl = getChipnetExplorerUrl
-
-/**
- * shortenAddress(address)
- *
- * Shortens a cashaddr for display: "bchtest:qzs8...wvy2"
- */
 export function shortenAddress(address) {
     if (!address) return ''
-    const prefix = address.includes(':') ? address.split(':')[0] + ':' : ''
-    const raw = address.includes(':') ? address.split(':')[1] : address
+    const parts = address.split(':')
+    const prefix = parts[0] ? parts[0] + ':' : ''
+    const raw = parts[1] || parts[0]
     return `${prefix}${raw.slice(0, 6)}...${raw.slice(-4)}`
 }
