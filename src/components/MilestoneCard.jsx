@@ -1,11 +1,20 @@
 import React from 'react'
 
 export default function MilestoneCard({ milestone, index, onVote }) {
-    const { title, status, votes } = milestone
-    const isApproved = status === 'Approved'
-    const totalVotes = votes.yes + votes.no
-    const yesPercent = totalVotes > 0 ? Math.round((votes.yes / totalVotes) * 100) : 0
-    const noPercent = totalVotes > 0 ? Math.round((votes.no / totalVotes) * 100) : 0
+    const { title, status, approved } = milestone
+
+    // Safe votes — DB milestones may not have a votes object at all
+    const votes = milestone.votes ?? { yes: milestone.voteYes ?? 0, no: milestone.voteNo ?? 0 }
+
+    // Approved if: DB flag set, status string says so, or local vote tally says so
+    const totalVotes = (votes.yes ?? 0) + (votes.no ?? 0)
+    const isApproved =
+        approved === true ||
+        status === 'Approved' || status === 'approved' ||
+        (totalVotes > 0 && (votes.yes ?? 0) / totalVotes > 0.5)
+
+    const yesPercent = totalVotes > 0 ? Math.round(((votes.yes ?? 0) / totalVotes) * 100) : 0
+    const noPercent = totalVotes > 0 ? Math.round(((votes.no ?? 0) / totalVotes) * 100) : 0
 
     return (
         <div className={`milestone-card p-5 ${isApproved ? 'milestone-approved' : ''}`}>

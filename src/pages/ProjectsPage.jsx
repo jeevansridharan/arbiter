@@ -36,9 +36,11 @@ import {
     AlertCircle, Inbox,
 } from 'lucide-react'
 
-import { supabase } from '../lib/supabaseClient'
+import { supabase, supabaseConfigured } from '../lib/supabase'
 import { createProject, deleteProject, updateRaisedAmount } from '../lib/db/projects'
 import { insertTransaction } from '../lib/db/transactions'
+import { createMilestoneBatch } from '../lib/db/milestones'
+import { voteOnMilestone } from '../lib/db/votes'
 import ProjectCard from '../components/ProjectCard'
 import ProjectForm from '../components/ProjectForm'
 import Dashboard from '../components/Dashboard'
@@ -83,6 +85,12 @@ export default function ProjectsPage() {
     const fetchProjects = useCallback(async () => {
         setLoading(true)   // show spinner
         setError(null)     // clear any previous error
+
+        if (!supabaseConfigured || !supabase) {
+            setError('Supabase not configured — add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY to your .env file.')
+            setLoading(false)
+            return
+        }
 
         const { data, error: sbError } = await supabase
             .from('projects')          // target table
@@ -139,20 +147,44 @@ export default function ProjectsPage() {
 
         if (insertError) {
             console.error('[ProjectsPage] handleProjectCreate: INSERT FAILED:', insertError)
-            // Throw so ProjectForm catches it and shows the error to the user
             throw new Error(insertError.message ?? 'Supabase insert failed')
         }
 
         console.log('[ProjectsPage] handleProjectCreate: ✓ project inserted:', newProject)
 
-        // ── Update UI after confirmed insert ──────────────────────────────────
+        // ── BUG FIX: Save milestones to Supabase ──────────────────────────────
+        // Previously milestones were only kept in local state with fake IDs,
+        // causing "No milestones defined" on the dashboard.
+        let savedMilestones = []
+        const rawMilestones = projectData.milestones ?? []
+        if (rawMilestones.length > 0) {
+            try {
+                const milestoneBatch = rawMilestones.map(m => ({
+                    title: m.title,
+                    description: m.description ?? '',
+                    amountAllocated: parseFloat(projectData.goal_amount) / rawMilestones.length,
+                }))
+                savedMilestones = await createMilestoneBatch(newProject.id, milestoneBatch)
+                console.log('[ProjectsPage] ✓ milestones inserted:', savedMilestones)
+            } catch (milestoneErr) {
+                console.error('[ProjectsPage] milestone insert failed:', milestoneErr.message)
+                // Don't block — project was created, milestones can be added later
+            }
+        }
+
+        // ── Normalise milestones shape for UI ─────────────────────────────────
+        const normalisedMilestones = savedMilestones.map(m => ({
+            ...m,
+            status: m.status ?? 'pending',
+            votes: { yes: 0, no: 0 },
+        }))
+
         const fullProject = {
             ...newProject,
-            milestones: projectData.milestones ?? [],
+            milestones: normalisedMilestones,
             raised_amount: 0,
         }
 
-        // Prepend to list so it appears immediately (optimistic UI)
         setProjects(prev => [fullProject, ...prev])
         setActiveProject(fullProject)
         setShowForm(false)
@@ -198,17 +230,48 @@ export default function ProjectsPage() {
 
     const handleFund = (amount, txHash, walletAddress) => handleTransaction(amount, txHash, 'funding', walletAddress)
 
-    const handleVote = (milestoneId, voteType) =>
+    const handleVote = async (milestoneId, voteType) => {
+        // BUG FIX: Write vote to Supabase database.
+        // Previously only updated local React state — votes were lost on refresh
+        // and never counted for governance.
+        try {
+            await voteOnMilestone({
+                milestoneId,
+                // Use a stable anonymous voter ID from localStorage so the
+                // UNIQUE(milestone_id, voter_id) constraint is respected
+                voterId: (() => {
+                    const key = 'milestara_anon_voter_id'
+                    let id = localStorage.getItem(key)
+                    if (!id) {
+                        id = 'anon_' + Math.random().toString(36).slice(2) + Date.now().toString(36)
+                        localStorage.setItem(key, id)
+                    }
+                    return id
+                })(),
+                vote: voteType === 'yes',
+                votingPower: 1,
+            })
+            console.log(`[ProjectsPage] ✓ Vote '${voteType}' recorded in DB for milestone:`, milestoneId)
+        } catch (voteErr) {
+            // Still update local state optimistically so UI feels responsive
+            console.warn('[ProjectsPage] DB vote failed (may already have voted):', voteErr.message)
+        }
+
+        // Always update local state for immediate feedback
         setActiveProject(prev => ({
             ...prev,
-            milestones: prev.milestones?.map(m =>
-                m.id !== milestoneId ? m : {
+            milestones: prev.milestones?.map(m => {
+                if (m.id !== milestoneId) return m
+                const newVotes = { ...m.votes, [voteType]: (m.votes?.[voteType] ?? 0) + 1 }
+                const total = newVotes.yes + newVotes.no
+                return {
                     ...m,
-                    votes: { ...m.votes, [voteType]: m.votes[voteType] + 1 },
-                    status: m.votes.yes + 1 > m.votes.no ? 'Approved' : 'Pending',
+                    votes: newVotes,
+                    status: total > 0 && newVotes.yes / total > 0.5 ? 'Approved' : 'Pending',
                 }
-            ),
+            }),
         }))
+    }
 
     const handleProjectDelete = async (projectId) => {
         const { error } = await deleteProject(projectId)

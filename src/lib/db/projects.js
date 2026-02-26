@@ -290,11 +290,12 @@ export async function fetchProjectById(id) {
     try {
         requireClient()
 
+        // Joining milestones and their nested votes
         const { data, error } = await supabase
             .from(TABLE)
             .select(`
                 *,
-                milestones (*),
+                milestones (*, votes(vote, token_amount)),
                 transactions (*)
             `)
             .eq('id', id)
@@ -303,6 +304,24 @@ export async function fetchProjectById(id) {
         if (error) {
             console.error('[fetchProjectById] ✗ Error:', error)
             return { data: null, error }
+        }
+
+        // Process milestones to aggregate vote tallies
+        if (data && data.milestones) {
+            data.milestones = data.milestones.map(m => {
+                const votes = m.votes ?? []
+                const yesWeight = votes.filter(v => v.vote === true).reduce((s, v) => s + v.token_amount, 0)
+                const noWeight = votes.filter(v => v.vote === false).reduce((s, v) => s + v.token_amount, 0)
+
+                return {
+                    ...m,
+                    votes: undefined, // remove raw array to keep it clean
+                    voteYes: yesWeight,
+                    voteNo: noWeight,
+                    voteTotal: yesWeight + noWeight,
+                    isApproved: m.approved || (yesWeight + noWeight > 0 && yesWeight / (yesWeight + noWeight) > 0.5)
+                }
+            })
         }
 
         console.info('[fetchProjectById] ✓ Found project:', data.title)

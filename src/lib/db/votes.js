@@ -52,13 +52,14 @@ export async function voteOnMilestone({ milestoneId, voterId, vote, votingPower 
     if (votingPower < 1) throw new Error('votingPower must be at least 1')
 
     // ── 1. Insert the vote ────────────────────────────────────────────────────
+    // DB uses wallet_address TEXT + token_amount NUMERIC (not voter_id FK)
     const { data: voteRecord, error: insertError } = await supabase
         .from('votes')
         .insert({
             milestone_id: milestoneId,
-            voter_id: voterId,
+            wallet_address: voterId,        // voterId used as wallet address string
             vote,
-            voting_power: votingPower,
+            token_amount: votingPower,    // ← DB column name
         })
         .select()
         .single()
@@ -75,7 +76,7 @@ export async function voteOnMilestone({ milestoneId, voterId, vote, votingPower 
     // ── 2. Recalculate vote tallies for this milestone ────────────────────────
     const { data: allVotes, error: fetchError } = await supabase
         .from('votes')
-        .select('vote, voting_power')
+        .select('vote, token_amount')   // ← correct column name
         .eq('milestone_id', milestoneId)
 
     if (fetchError) {
@@ -83,8 +84,8 @@ export async function voteOnMilestone({ milestoneId, voterId, vote, votingPower 
         throw new Error(fetchError.message)
     }
 
-    const yesWeight = allVotes.filter(v => v.vote === true).reduce((s, v) => s + v.voting_power, 0)
-    const noWeight = allVotes.filter(v => v.vote === false).reduce((s, v) => s + v.voting_power, 0)
+    const yesWeight = allVotes.filter(v => v.vote === true).reduce((s, v) => s + v.token_amount, 0)
+    const noWeight = allVotes.filter(v => v.vote === false).reduce((s, v) => s + v.token_amount, 0)
     const total = yesWeight + noWeight
     const yesPercent = total > 0 ? Math.round((yesWeight / total) * 100) : 0
     const milestoneApproved = total > 0 && (yesWeight / total) > APPROVAL_THRESHOLD
@@ -123,10 +124,7 @@ export async function getVotesByMilestone(milestoneId) {
 
     const { data, error } = await supabase
         .from('votes')
-        .select(`
-            *,
-            voter:users(wallet_address)
-        `)
+        .select('*')          // wallet_address is the voter identifier
         .eq('milestone_id', milestoneId)
         .order('created_at', { ascending: false })
 
@@ -157,7 +155,7 @@ export async function hasUserVoted(milestoneId, voterId) {
         .from('votes')
         .select('id', { count: 'exact', head: true })
         .eq('milestone_id', milestoneId)
-        .eq('voter_id', voterId)
+        .eq('wallet_address', voterId)   // ← DB column is wallet_address
 
     if (error) {
         console.error('[db/votes] hasUserVoted error:', error)

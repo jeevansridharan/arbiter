@@ -20,7 +20,6 @@ import {
     clearContractState,
 } from '../services/milestoneContract'
 import { PROJECT_ADDRESS } from '../services/bchWallet'
-import { tallyVotes } from '../../production/services/tallyEngine'
 
 // ── Spinner ──────────────────────────────────────────────────────────────────
 function Spinner() {
@@ -70,27 +69,22 @@ export default function GovernancePanel({ wallet, milestones = [], onMilestoneAp
 
     // ── Load state ────────────────────────────────────────────────────────────
     const refreshState = useCallback(async () => {
-        // Fetch on-chain token balance for this wallet
-        // In production, we'd check for the specific categoryId
-        const bal = await getLockedAmount() // Temporary placeholder for actual token fetch
+        // Fetch current UI stats from localStorage (Production logic uses scanners)
         setTokenBal(wallet?.tokens ? Number(wallet.tokens) : 0)
         setLockedBch(getLockedAmount())
 
         const votes = {}
-        for (const m of milestones) {
-            // Live UTXO tally for each milestone's category
-            try {
-                const res = await tallyVotes(m.token_category_id || 'mock_category')
-                votes[m.id] = { yes: Number(res.yesVotes), no: Number(res.noVotes) }
-            } catch (err) {
-                console.error('Tally fail:', err)
-                votes[m.id] = { yes: 0, no: 0 }
+        milestones.forEach(m => {
+            // Aggregated votes from DB milestones prop (calculated in fetchProjectById)
+            votes[m.id] = {
+                yes: m.voteYes ?? 0,
+                no: m.voteNo ?? 0
             }
-        }
+        })
         setMilestoneVotes(votes)
     }, [milestones, wallet?.cashaddr])
 
-    useEffect(() => { refreshState() }, [refreshState])
+    useEffect(() => { refreshState() }, [refreshState, milestones])
 
     if (!wallet) {
         return (

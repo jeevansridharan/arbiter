@@ -95,7 +95,10 @@ export default function Dashboard({ project: initialProject, onFund, onVote, onT
     const fundingTarget = parseFloat(project?.goal_amount ?? project?.fundingTarget ?? 0)
     const fundedAmount = parseFloat(project?.raised_amount ?? project?.fundedAmount ?? 0)
     const milestones = Array.isArray(project?.milestones) ? project.milestones : []
-    const approvedCount = milestones.filter(m => m.status === 'Approved' || m.status === 'approved').length
+    // DB milestones use `approved` boolean; locally created ones use status string
+    const approvedCount = milestones.filter(
+        m => m.approved === true || m.status === 'Approved' || m.status === 'approved'
+    ).length
 
     // ── Render Logic ──────────────────────────────────────────────────────────
 

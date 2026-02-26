@@ -52,8 +52,8 @@ export async function createMilestone({ projectId, title, description, amountAll
             project_id: projectId,
             title: title.trim(),
             description: description?.trim() ?? '',
-            amount_allocated: amountAllocated,
-            status: 'pending',
+            amount: amountAllocated,   // ← DB column is `amount`
+            approved: false,              // ← DB uses boolean, not status text
         })
         .select()
         .single()
@@ -86,8 +86,8 @@ export async function createMilestoneBatch(projectId, milestonesArray) {
         project_id: projectId,
         title: m.title.trim(),
         description: m.description?.trim() ?? '',
-        amount_allocated: m.amountAllocated,
-        status: 'pending',
+        amount: m.amountAllocated,   // ← DB column is `amount`
+        approved: false,               // ← DB uses boolean
     }))
 
     const { data, error } = await supabase
@@ -121,7 +121,7 @@ export async function fetchMilestonesByProject(projectId) {
         .from('milestones')
         .select(`
             *,
-            votes(vote, voting_power)
+            votes(vote, token_amount)
         `)
         .eq('project_id', projectId)
         .order('created_at', { ascending: true })
@@ -134,15 +134,15 @@ export async function fetchMilestonesByProject(projectId) {
     // Compute yes/no tallies locally from the joined vote rows
     return (data ?? []).map(m => {
         const votes = m.votes ?? []
-        const yesWeight = votes.filter(v => v.vote === true).reduce((s, v) => s + v.voting_power, 0)
-        const noWeight = votes.filter(v => v.vote === false).reduce((s, v) => s + v.voting_power, 0)
+        const yesWeight = votes.filter(v => v.vote === true).reduce((s, v) => s + v.token_amount, 0)
+        const noWeight = votes.filter(v => v.vote === false).reduce((s, v) => s + v.token_amount, 0)
         return {
             ...m,
-            votes: undefined,     // remove raw array
+            votes: undefined,   // remove raw array
             voteYes: yesWeight,
             voteNo: noWeight,
             voteTotal: yesWeight + noWeight,
-            isApproved: yesWeight + noWeight > 0 && yesWeight / (yesWeight + noWeight) > 0.5,
+            isApproved: m.approved || (yesWeight + noWeight > 0 && yesWeight / (yesWeight + noWeight) > 0.5),
         }
     })
 }
@@ -162,14 +162,12 @@ export async function fetchMilestonesByProject(projectId) {
 export async function updateMilestoneStatus(milestoneId, status) {
     if (!milestoneId) throw new Error('milestoneId is required')
 
-    const validStatuses = ['pending', 'voting', 'approved', 'released', 'rejected']
-    if (!validStatuses.includes(status)) {
-        throw new Error(`Invalid status. Must be one of: ${validStatuses.join(', ')}`)
-    }
+    // DB uses `approved` boolean — map status string accordingly
+    const approved = status === 'approved' || status === 'released'
 
     const { data, error } = await supabase
         .from('milestones')
-        .update({ status })
+        .update({ approved })
         .eq('id', milestoneId)
         .select()
         .single()
