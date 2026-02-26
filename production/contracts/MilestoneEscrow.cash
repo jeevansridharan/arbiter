@@ -1,0 +1,49 @@
+pragma cashscript ^0.10.0;
+
+/**
+ * MilestoneEscrow.cash
+ * 
+ * A non-custodial milestone escrow contract for Milestara.
+ * Funds are locked until:
+ * 1. Governance Approval: A Tally Oracle signs a proof of milestone completion.
+ * 2. Refund: If a deadline passes, the funder can reclaim the funds.
+ */
+contract MilestoneEscrow(
+    pubkey creatorPk,      // Project creator who receives funds
+    pubkey funderPk,       // Funder who can refund if project stalls
+    pubkey tallyOraclePk,  // The Tally Engine public key (the "Oracle")
+    bytes32 milestoneId,   // Unique identifier for this milestone
+    int deadline           // Block height/timestamp for refund safety
+) {
+    /**
+     * release()
+     * Allows the creator to claim the funds if governance approval is reached.
+     */
+    function release(sig creatorSig, sig oracleSig, bytes tallyProof) {
+        // 1. Verify the Tally Engine confirms this milestone passed governance
+        // Proof format: [milestoneId (32 bytes)][status (1 byte: 0x01=Approved)]
+        require(checkDataSig(oracleSig, tallyProof, tallyOraclePk));
+        require(tallyProof == milestoneId + 0x01);
+
+        // 2. Ensure the payout goes strictly to the Project Creator (P2PKH)
+        bytes20 creatorHash = hash160(creatorPk);
+        bytes creatorLock = new LockingBytecodeP2PKH(creatorHash);
+        
+        // Ensure the first output of the spending TX goes to the creator
+        // We allow for a small fee deduction (standard 1000 sats)
+        require(tx.outputs[0].lockingBytecode == creatorLock);
+        require(tx.outputs[0].value >= tx.inputs[this.activeInputIndex].value - 1000);
+
+        // 3. Verify creator actually wants to claim the funds
+        require(checkSig(creatorSig, creatorPk));
+    }
+
+    /**
+     * refund()
+     * Returns funds to the funder if the project doesn't meet its deadline.
+     */
+    function refund(sig funderSig) {
+        require(tx.time >= deadline);
+        require(checkSig(funderSig, funderPk));
+    }
+}

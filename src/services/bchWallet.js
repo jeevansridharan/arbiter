@@ -52,34 +52,33 @@ async function setupChipnetProvider(wallet) {
 // ─── Wallet Creation & Loading ───────────────────────────────────────────────
 
 /**
- * createOrLoadWallet()
+ * initializeWallet(wif)
  * 
- * Restores or generates a "chipnet" wallet.
- * Ensures the wallet is pointing to the Chipnet Electrum server.
+ * Initializes a "chipnet" wallet.
+ * If WIF is provided, it imports the wallet.
+ * If not, it creates a new random one for the session.
+ * Does NOT save to localStorage (session-only for security).
  */
-export async function createOrLoadWallet() {
-    const savedWif = localStorage.getItem(WALLET_STORAGE_KEY)
+export async function initializeWallet(wif = null) {
     let wallet
 
     try {
-        if (savedWif) {
-            console.log('[bchWallet] Loading existing wallet from saved WIF:', savedWif.slice(0, 5) + '...')
-            wallet = await TestNetWallet.fromWIF(savedWif)
+        if (wif) {
+            console.log('[bchWallet] Initializing wallet from provided WIF...')
+            wallet = await TestNetWallet.fromWIF(wif)
         } else {
-            console.log('[bchWallet] No saved wallet found. Creating new random chipnet wallet...')
+            console.log('[bchWallet] Creating new random chipnet wallet (Session Only)...')
             wallet = await TestNetWallet.newRandom()
-            localStorage.setItem(WALLET_STORAGE_KEY, wallet.privateKeyWif)
         }
 
         console.log('[bchWallet] Wallet Address:', wallet.cashaddr)
-        console.log('[bchWallet] Network Type:', wallet.network)
 
         // Force connection to Chipnet nodes
         await setupChipnetProvider(wallet)
 
         return wallet
     } catch (err) {
-        console.error('[bchWallet] Error in createOrLoadWallet:', err)
+        console.error('[bchWallet] Error in initializeWallet:', err)
         throw err
     }
 }
@@ -148,8 +147,7 @@ export async function fundProject(wallet, amountBch) {
 // ─── Utility Functions ───────────────────────────────────────────────────────
 
 export function disconnectWallet() {
-    localStorage.removeItem(WALLET_STORAGE_KEY)
-    console.log('[bchWallet] Wallet disconnected.')
+    console.log('[bchWallet] Wallet session cleared.')
 }
 
 export function getExplorerUrl(txId) {

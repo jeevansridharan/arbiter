@@ -2,7 +2,7 @@ import React from 'react'
 
 export default function ProgressBar({ current, target }) {
     const percentage = target > 0 ? Math.min((current / target) * 100, 100) : 0
-    const displayPct = percentage.toFixed(1)
+    const displayPct = percentage.toFixed(2)
 
     return (
         <div>
@@ -15,9 +15,9 @@ export default function ProgressBar({ current, target }) {
             <div className="progress-track" style={{ background: 'rgba(255,255,255,0.06)', borderRadius: '999px', height: '8px', overflow: 'hidden' }}>
                 <div
                     className="progress-fill"
-                    style={{ width: `${percentage}%`, background: 'linear-gradient(90deg, #10b981, #06b6d4)', height: '100%', borderRadius: '999px', transition: 'width 0.6s ease' }}
+                    style={{ width: `${displayPct}%`, background: 'linear-gradient(90deg, #10b981, #06b6d4)', height: '100%', borderRadius: '999px', transition: 'width 0.6s ease' }}
                     role="progressbar"
-                    aria-valuenow={percentage}
+                    aria-valuenow={displayPct}
                     aria-valuemin="0"
                     aria-valuemax="100"
                 />

@@ -77,7 +77,7 @@ export default function Dashboard({ project: initialProject, onFund, onVote, onT
     const handleFundComplete = async (amount, txHash) => {
         console.log(`[Dashboard] Funding complete. Refreshing UI...`)
         // 1. Notify parent (which records tx and updates DB)
-        if (onFund) await onFund(amount, txHash)
+        if (onFund) await onFund(amount, txHash, connectedWallet?.cashaddr)
 
         // 2. Refresh local data from DB to reflect the new raised_amount
         await fetchProjectData(true)
@@ -180,7 +180,7 @@ export default function Dashboard({ project: initialProject, onFund, onVote, onT
                 milestones={milestones}
                 onMilestoneApproved={handleGovApproval}
                 onTransaction={async (amt, hash, type) => {
-                    if (onTransaction) await onTransaction(amt, hash, type)
+                    if (onTransaction) await onTransaction(amt, hash, type, connectedWallet?.cashaddr)
                     await fetchProjectData(true)
                 }}
             />

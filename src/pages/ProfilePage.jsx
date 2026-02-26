@@ -1,12 +1,12 @@
 /**
  * pages/ProfilePage.jsx
- * Wallet identity + account overview.
+ * Wallet identity + account overview (Non-Custodial Refactor)
  */
 
 import React, { useState, useEffect } from 'react'
 import { Copy, CheckCircle, Wallet, Shield, ExternalLink, LogOut } from 'lucide-react'
-import { createOrLoadWallet, disconnectWallet } from '../services/bchWallet'
-import { getTokenBalance, getLockedAmount } from '../services/milestoneContract'
+import { initializeWallet, disconnectWallet } from '../services/bchWallet'
+import { getLockedAmount } from '../services/milestoneContract'
 
 // ── Info row ──────────────────────────────────────────────────────────────────
 function InfoRow({ label, value, mono = false, color = '#94a3b8' }) {
@@ -29,21 +29,9 @@ export default function ProfilePage() {
     const [loading, setLoading] = useState(false)
 
     useEffect(() => {
-        const savedKey = localStorage.getItem('milestara_chipnet_wif')
-        if (savedKey) {
-            ; (async () => {
-                setLoading(true)
-                try {
-                    const w = await createOrLoadWallet()
-                    setAddress(w.cashaddr)
-                } catch (e) {
-                    console.error(e)
-                } finally {
-                    setLoading(false)
-                }
-            })()
-        }
-        setTokens(getTokenBalance())
+        // In the production model, we don't auto-load from localStorage.
+        // If there's a wallet in the current session (to-do: use global context),
+        // we display it. For now, we keep it empty until user connects.
         setLocked(getLockedAmount())
     }, [])
 
@@ -59,6 +47,8 @@ export default function ProfilePage() {
         setAddress('')
         setTokens(0)
         setLocked(0)
+        // Clear session
+        window.location.reload()
     }
 
     return (
@@ -68,7 +58,7 @@ export default function ProfilePage() {
                 <h1 style={{ fontSize: '1.75rem', fontWeight: 800, color: '#f1f5f9', letterSpacing: '-0.03em', marginBottom: '6px' }}>
                     Profile
                 </h1>
-                <p style={{ color: '#64748b', fontSize: '0.9rem' }}>Your wallet identity on Milestara</p>
+                <p style={{ color: '#64748b', fontSize: '0.9rem' }}>Your non-custodial wallet identity</p>
             </div>
 
             {/* Wallet card */}
@@ -83,7 +73,7 @@ export default function ProfilePage() {
                         <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '4px' }}>
                             <div style={{ width: '7px', height: '7px', borderRadius: '50%', background: address ? '#10b981' : '#475569', boxShadow: address ? '0 0 6px rgba(16,185,129,0.8)' : 'none' }} />
                             <span style={{ fontSize: '0.75rem', color: address ? '#10b981' : '#475569', fontWeight: 600 }}>
-                                {address ? 'Connected · Chipnet' : 'Not connected'}
+                                {address ? 'Active Session · Chipnet' : 'Session Inactive'}
                             </span>
                         </div>
                     </div>
@@ -94,10 +84,9 @@ export default function ProfilePage() {
                     <>
                         <InfoRow label="Wallet Address" value={address} mono color="#10b981" />
                         <InfoRow label="Network" value="Bitcoin Cash Chipnet (Testnet)" color="#34d399" />
-                        <InfoRow label="GOV Tokens" value={`${tokens} tokens`} color="#10b981" />
+                        <InfoRow label="Session GOV Tokens" value={`${tokens} tokens`} color="#10b981" />
                         <InfoRow label="Locked BCH" value={`${locked.toFixed(8)} BCH`} color="#34d399" />
 
-                        {/* Copy + explorer buttons */}
                         <div style={{ display: 'flex', gap: '10px', marginTop: '20px' }}>
                             <button
                                 onClick={handleCopy}
@@ -129,7 +118,7 @@ export default function ProfilePage() {
                 ) : (
                     <div style={{ textAlign: 'center', padding: '20px 0' }}>
                         <p style={{ color: '#475569', fontSize: '0.875rem', marginBottom: '16px' }}>
-                            Go to <strong style={{ color: '#10b981' }}>Projects</strong> and click <strong style={{ color: '#10b981' }}>Connect Wallet</strong> to get started.
+                            Go to <strong style={{ color: '#10b981' }}>Projects</strong> and connect your wallet to see your profile details.
                         </p>
                     </div>
                 )}
@@ -138,16 +127,16 @@ export default function ProfilePage() {
             {/* Security card */}
             <div style={{ background: 'rgba(15,17,35,0.85)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '16px', padding: '24px', backdropFilter: 'blur(20px)', marginBottom: '20px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '14px' }}>
-                    <Shield size={16} color="#f59e0b" />
-                    <h2 style={{ color: '#f59e0b', fontWeight: 700, fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                        Security Notes
+                    <Shield size={16} color="#fbbf24" />
+                    <h2 style={{ color: '#fbbf24', fontWeight: 700, fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                        Security Protocol
                     </h2>
                 </div>
                 {[
-                    'Your private key is stored only in this browser\'s localStorage.',
-                    'This is a TESTNET wallet. Never use real mainnet BCH here.',
-                    'Clearing browser data will permanently delete your wallet.',
-                    'The anon Supabase key is public — RLS policies protect your data.',
+                    'Non-Custodial: Your private keys are NEVER stored in the browser (localStorage).',
+                    'Session-Only: Private keys exist only in computer memory for the current session.',
+                    'This is a TESTNET wallet. Do not send real BCH to these addresses.',
+                    'Identity Persistence: Refreshing or closing the tab will clear your wallet access.',
                 ].map((note, i) => (
                     <p key={i} style={{ color: '#64748b', fontSize: '0.8rem', lineHeight: 1.7 }}>• {note}</p>
                 ))}
@@ -163,10 +152,8 @@ export default function ProfilePage() {
                         color: '#f87171', fontWeight: 700, fontSize: '0.875rem',
                         display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', transition: 'all 0.2s',
                     }}
-                    onMouseEnter={e => e.currentTarget.style.background = 'rgba(225,29,72,0.12)'}
-                    onMouseLeave={e => e.currentTarget.style.background = 'rgba(225,29,72,0.07)'}
                 >
-                    <LogOut size={16} /> Disconnect &amp; Clear Wallet
+                    <LogOut size={16} /> Disconnect &amp; Clear Session
                 </button>
             )}
         </div>

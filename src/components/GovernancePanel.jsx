@@ -15,14 +15,12 @@ import {
     fundMilestoneContract,
     castVote,
     releaseMilestoneFunds,
-    getTokenBalance,
     getLockedAmount,
-    getMilestoneVotes,
-    isMilestoneApproved,
     chipnetExplorerUrl,
     clearContractState,
 } from '../services/milestoneContract'
 import { PROJECT_ADDRESS } from '../services/bchWallet'
+import { tallyVotes } from '../../production/services/tallyEngine'
 
 // ── Spinner ──────────────────────────────────────────────────────────────────
 function Spinner() {
@@ -71,15 +69,26 @@ export default function GovernancePanel({ wallet, milestones = [], onMilestoneAp
     const [milestoneVotes, setMilestoneVotes] = useState({})
 
     // ── Load state ────────────────────────────────────────────────────────────
-    const refreshState = useCallback(() => {
-        setTokenBal(getTokenBalance())
+    const refreshState = useCallback(async () => {
+        // Fetch on-chain token balance for this wallet
+        // In production, we'd check for the specific categoryId
+        const bal = await getLockedAmount() // Temporary placeholder for actual token fetch
+        setTokenBal(wallet?.tokens ? Number(wallet.tokens) : 0)
         setLockedBch(getLockedAmount())
+
         const votes = {}
-        milestones.forEach(m => {
-            votes[m.id] = getMilestoneVotes(m.id)
-        })
+        for (const m of milestones) {
+            // Live UTXO tally for each milestone's category
+            try {
+                const res = await tallyVotes(m.token_category_id || 'mock_category')
+                votes[m.id] = { yes: Number(res.yesVotes), no: Number(res.noVotes) }
+            } catch (err) {
+                console.error('Tally fail:', err)
+                votes[m.id] = { yes: 0, no: 0 }
+            }
+        }
         setMilestoneVotes(votes)
-    }, [milestones])
+    }, [milestones, wallet?.cashaddr])
 
     useEffect(() => { refreshState() }, [refreshState])
 
@@ -106,7 +115,7 @@ export default function GovernancePanel({ wallet, milestones = [], onMilestoneAp
             if (onTransaction) {
                 onTransaction(parsed, result.simulatedTxId, 'funding')
             }
-            refreshState()
+            await refreshState()
         } catch (e) {
             setError(e.message || 'Minting failed')
         } finally {
@@ -118,11 +127,17 @@ export default function GovernancePanel({ wallet, milestones = [], onMilestoneAp
         setError('')
         setVoteLoading(milestoneId + voteType)
         try {
-            const result = castVote(milestoneId, voteType, voteTokens)
-            refreshState()
-            if (result.isApproved && onMilestoneApproved) {
-                onMilestoneApproved(milestoneId)
+            // ON-CHAIN VOTING: Send tokens to Approve/Reject script 
+            // This is a physical blockchain transaction
+            const res = await castVote(wallet, milestoneId, voteType, voteTokens)
+
+            if (res.txId) {
+                console.log(`[GovernancePanel] Vote TX Broadcasted: ${res.txId}`)
+                // Optionally show a success toast or update a 'votes' list
             }
+
+            // Re-sync UI (Blockchain might take a few seconds to update, but we trigger a refresh)
+            setTimeout(() => refreshState(), 2000)
         } catch (e) {
             setError(e.message)
         } finally {

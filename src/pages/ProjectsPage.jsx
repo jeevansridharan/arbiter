@@ -158,9 +158,10 @@ export default function ProjectsPage() {
         setShowForm(false)
     }
 
-    const handleTransaction = async (amount, txHash, type = 'funding') => {
+    const handleTransaction = async (amount, txHash, type = 'funding', walletAddress) => {
         if (!activeProject) return
-        console.log(`[ProjectsPage] handleTransaction: ${type} of ${amount} BCH (${txHash})`)
+        const finalWallet = walletAddress || PLACEHOLDER_WALLET
+        console.log(`[ProjectsPage] handleTransaction: ${type} of ${amount} BCH (${txHash}) by ${finalWallet}`)
 
         // 1. Record in transactions table
         if (txHash) {
@@ -170,6 +171,7 @@ export default function ProjectsPage() {
                     txHash,
                     amount,
                     type,
+                    walletAddress: finalWallet,
                 })
                 console.log(`[ProjectsPage] ✓ ${type} recorded in database`)
             } catch (err) {
@@ -194,7 +196,7 @@ export default function ProjectsPage() {
         }
     }
 
-    const handleFund = (amount, txHash) => handleTransaction(amount, txHash, 'funding')
+    const handleFund = (amount, txHash, walletAddress) => handleTransaction(amount, txHash, 'funding', walletAddress)
 
     const handleVote = (milestoneId, voteType) =>
         setActiveProject(prev => ({

@@ -39,24 +39,30 @@ function requireSupabase() {
  * @param {'funding'|'release'|'refund'} params.type  Type of transaction
  * @returns {Promise<Transaction>}
  */
-export async function insertTransaction({ projectId, txHash, amount, type }) {
+export async function insertTransaction({ projectId, txHash, amount, type, walletAddress }) {
     if (!projectId) throw new Error('projectId is required')
     if (!txHash) throw new Error('txHash is required')
     if (!amount || amount <= 0) throw new Error('amount must be > 0')
+    if (!walletAddress) throw new Error('walletAddress is required')
 
     const validTypes = ['funding', 'release', 'refund']
     if (!validTypes.includes(type)) {
         throw new Error(`Invalid type. Must be one of: ${validTypes.join(', ')}`)
     }
 
+    const payload = {
+        project_id: projectId,
+        tx_hash: txHash,
+        wallet_address: walletAddress,
+        amount,
+        type,
+    }
+
+    console.log('[db/transactions] 🚀 Attempting Supabase insert:', payload)
+
     const { data, error } = await supabase
         .from('transactions')
-        .insert({
-            project_id: projectId,
-            tx_hash: txHash,
-            amount,
-            type,
-        })
+        .insert(payload)
         .select()
         .single()
 

@@ -10,11 +10,13 @@
  *   CREATE TABLE users (
  *     id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
  *     wallet_address TEXT UNIQUE NOT NULL,
+ *     gov_balance    NUMERIC DEFAULT 0,
  *     created_at     TIMESTAMPTZ DEFAULT now()
  *   );
  *   ALTER TABLE users ENABLE ROW LEVEL SECURITY;
  *   CREATE POLICY "Public read" ON users FOR SELECT USING (true);
  *   CREATE POLICY "Insert own" ON users FOR INSERT WITH CHECK (true);
+ *   CREATE POLICY "Update own" ON users FOR UPDATE USING (true);
  */
 
 import { supabase } from '../supabase'
@@ -87,4 +89,49 @@ export async function getUserByWallet(walletAddress) {
     }
 
     return data  // User object or null
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * updateGovBalance(walletAddress, amountChange)
+ *
+ * Increments or decrements the gov_balance for a user.
+ *
+ * @param {string} walletAddress
+ * @param {number} amountChange  Can be positive (minting) or negative (voting)
+ */
+export async function updateGovBalance(walletAddress, amountChange) {
+    if (!walletAddress) throw new Error('walletAddress is required')
+    requireSupabase()
+
+    // 1. Get current balance
+    const user = await getUserByWallet(walletAddress)
+    if (!user) {
+        // Create user if they don't exist
+        await upsertUser(walletAddress)
+    }
+
+    const { data: currentUser } = await supabase
+        .from('users')
+        .select('gov_balance')
+        .eq('wallet_address', walletAddress)
+        .single()
+
+    const newBalance = (currentUser?.gov_balance || 0) + amountChange
+
+    // 2. Update
+    const { data, error } = await supabase
+        .from('users')
+        .update({ gov_balance: newBalance })
+        .eq('wallet_address', walletAddress)
+        .select()
+        .single()
+
+    if (error) {
+        console.error('[db/users] updateGovBalance error:', error)
+        throw new Error(error.message)
+    }
+
+    return data
 }

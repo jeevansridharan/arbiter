@@ -2,7 +2,7 @@
  * WalletPanel.jsx
  *
  * Handles the full wallet UX for Chipnet:
- *  - Connect / Generate Chipnet wallet
+ *  - Connect / Generate Chipnet wallet (Session-only, Non-Custodial)
  *  - Display address + live balance
  *  - Fund project form (amount input + send button)
  *  - Transaction hash display + explorer link
@@ -10,7 +10,7 @@
 
 import React, { useState, useCallback } from 'react'
 import {
-    createOrLoadWallet,
+    initializeWallet,
     getBalance,
     fundProject,
     disconnectWallet,
@@ -43,15 +43,18 @@ export default function WalletPanel({ onRealFund, onWalletConnect }) {
     const [sendLoading, setSendLoading] = useState(false)
     const [txStatus, setTxStatus] = useState('idle') // 'idle'|'sending'|'success'|'error'
     const [showQr, setShowQr] = useState(false)
+    const [wifInput, setWifInput] = useState('')
+    const [copied, setCopied] = useState(false)
 
     // ── Helpers ───────────────────────────────────────────────────────────────
     const clearError = () => setError('')
 
     const refreshBalance = useCallback(async (w) => {
-        if (!w && !wallet) return
+        const targetWallet = w || wallet
+        if (!targetWallet) return
         setBalanceLoading(true)
         try {
-            const bal = await getBalance(w ?? wallet)
+            const bal = await getBalance(targetWallet)
             setBalance(bal)
         } catch (e) {
             setError('Could not fetch balance. Check Chipnet connection.')
@@ -61,18 +64,18 @@ export default function WalletPanel({ onRealFund, onWalletConnect }) {
     }, [wallet])
 
     // ── Connect wallet ────────────────────────────────────────────────────────
-    const handleConnect = async () => {
+    const handleConnect = async (isImport = false) => {
         clearError()
         setConnectLoading(true)
         try {
-            const w = await createOrLoadWallet()
+            const w = await initializeWallet(isImport ? wifInput : null)
             setWallet(w)
             setAddress(w.cashaddr)
             await refreshBalance(w)
             if (onWalletConnect) onWalletConnect(w)
         } catch (e) {
             console.error(e)
-            setError('Failed to create wallet: ' + e.message)
+            setError('Failed to initialize wallet: ' + e.message)
         } finally {
             setConnectLoading(false)
         }
@@ -87,6 +90,7 @@ export default function WalletPanel({ onRealFund, onWalletConnect }) {
         setAmount('')
         setTxId('')
         setTxStatus('idle')
+        setWifInput('')
         clearError()
         if (onWalletConnect) onWalletConnect(null)
     }
@@ -124,7 +128,6 @@ export default function WalletPanel({ onRealFund, onWalletConnect }) {
     }
 
     // ── Copy address ──────────────────────────────────────────────────────────
-    const [copied, setCopied] = useState(false)
     const handleCopy = () => {
         navigator.clipboard.writeText(address)
         setCopied(true)
@@ -142,7 +145,7 @@ export default function WalletPanel({ onRealFund, onWalletConnect }) {
                     </div>
                     <div>
                         <h2 className="text-white font-bold text-base">Bitcoin Cash Wallet</h2>
-                        <p className="text-slate-500 text-xs">Chipnet (Testnet)</p>
+                        <p className="text-slate-500 text-xs">Chipnet (Testnet · Non-Custodial)</p>
                     </div>
                     <div className="ml-auto flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold" style={{ background: 'rgba(100,116,139,0.12)', border: '1px solid rgba(100,116,139,0.2)', color: '#94a3b8' }}>
                         <div className="w-1.5 h-1.5 rounded-full bg-slate-500"></div>
@@ -150,26 +153,44 @@ export default function WalletPanel({ onRealFund, onWalletConnect }) {
                     </div>
                 </div>
 
-                <p className="text-slate-400 text-sm mb-5 leading-relaxed">
-                    Connect a Chipnet wallet to send BCH test transactions to the project address.
-                    A new wallet is auto-generated and saved in your browser.
-                </p>
+                <div className="space-y-4">
+                    <div className="p-4 rounded-xl" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
+                        <p className="text-slate-400 text-xs mb-3 font-semibold uppercase tracking-wider">Session-Only Import (Safe)</p>
+                        <input
+                            type="password"
+                            placeholder="Enter Wallet WIF (starts with c...)"
+                            value={wifInput}
+                            onChange={(e) => setWifInput(e.target.value)}
+                            className="input-web3 mb-3 text-xs"
+                        />
+                        <button
+                            onClick={() => handleConnect(true)}
+                            disabled={connectLoading || !wifInput}
+                            className="w-full py-2.5 rounded-lg font-bold text-white gradient-btn-green text-sm disabled:opacity-50"
+                        >
+                            {connectLoading ? <Spinner /> : 'Import Wallet'}
+                        </button>
+                    </div>
 
-                <button
-                    id="connect-wallet-btn"
-                    onClick={handleConnect}
-                    disabled={connectLoading}
-                    className="w-full py-3.5 rounded-xl font-bold text-white gradient-btn-green flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
-                >
-                    {connectLoading ? (
-                        <><Spinner /> Generating Chipnet Wallet…</>
-                    ) : (
-                        <>
-                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M12 2L3 12L12 22L21 12L12 2Z" stroke="currentColor" strokeWidth="2" /></svg>
-                            Connect Wallet
-                        </>
-                    )}
-                </button>
+                    <div className="text-center relative">
+                        <hr className="border-slate-800" />
+                        <span className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 px-3 bg-[#0f1123] text-[10px] text-slate-600 font-bold uppercase">OR</span>
+                    </div>
+
+                    <button
+                        id="generate-wallet-btn"
+                        onClick={() => handleConnect(false)}
+                        disabled={connectLoading}
+                        className="w-full py-3.5 rounded-xl font-bold text-slate-300 hover:text-white transition-all flex items-center justify-center gap-2 border border-slate-700 hover:border-emerald-500/50 bg-slate-400/5"
+                    >
+                        {connectLoading ? <><Spinner /> Generating…</> : 'Generate New Session Wallet'}
+                    </button>
+                </div>
+
+                <p className="text-slate-500 text-[10px] mt-4 text-center leading-relaxed">
+                    Personal keys are never stored in your browser. <br />
+                    Refreshing the page will clear the session wallet.
+                </p>
 
                 {error && <ErrorBox message={error} onClose={clearError} />}
             </div>
@@ -186,7 +207,7 @@ export default function WalletPanel({ onRealFund, onWalletConnect }) {
                 </div>
                 <div>
                     <h2 className="text-white font-bold text-base">Bitcoin Cash Wallet</h2>
-                    <p className="text-slate-500 text-xs">Chipnet (Testnet)</p>
+                    <p className="text-slate-500 text-xs">Chipnet (Testnet · Active Session)</p>
                 </div>
                 <div className="ml-auto flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold" style={{ background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.25)', color: '#10b981' }}>
                     <div className="w-1.5 h-1.5 rounded-full bg-emerald-400" style={{ boxShadow: '0 0 5px rgba(52,211,153,0.9)' }}></div>
@@ -235,17 +256,6 @@ export default function WalletPanel({ onRealFund, onWalletConnect }) {
                         <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest text-center">
                             Scan with Paytaca, Zapit, or Cashonize
                         </p>
-                        <div className="flex gap-4 mt-2">
-                            <a href="https://cashonize.com" target="_blank" rel="noreferrer" title="Cashonize">
-                                <img src="https://cashonize.com/favicon.ico" className="w-6 h-6 rounded-full grayscale hover:grayscale-0 transition-all" alt="Cashonize" />
-                            </a>
-                            <a href="https://paytaca.com" target="_blank" rel="noreferrer" title="Paytaca">
-                                <img src="https://www.paytaca.com/img/favicon.png" className="w-6 h-6 rounded-md grayscale hover:grayscale-0 transition-all" alt="Paytaca" />
-                            </a>
-                            <a href="https://zapit.io" target="_blank" rel="noreferrer" title="Zapit">
-                                <img src="https://www.zapit.io/favicon.ico" className="w-6 h-6 rounded-md grayscale hover:grayscale-0 transition-all" alt="Zapit" />
-                            </a>
-                        </div>
                     </div>
                 )}
             </div>
@@ -289,27 +299,17 @@ export default function WalletPanel({ onRealFund, onWalletConnect }) {
                                 style={{ background: 'rgba(251,191,36,0.12)', color: '#fbbf24', border: '1px solid rgba(251,191,36,0.2)' }}>
                                 <span>🟡</span>
                                 <span>faucet.paytaca.com</span>
-                                <span className="ml-auto text-[9px] font-bold px-1.5 py-0.5 rounded" style={{ background: 'rgba(16,185,129,0.15)', color: '#10b981' }}>✓ LIVE</span>
                             </a>
                             <a href="https://tbch.googol.cash" target="_blank" rel="noreferrer"
                                 className="flex items-center gap-2 text-xs font-semibold px-2 py-1.5 rounded-lg transition-all"
                                 style={{ background: 'rgba(251,191,36,0.12)', color: '#fbbf24', border: '1px solid rgba(251,191,36,0.2)' }}>
                                 <span>⚡</span>
                                 <span>tbch.googol.cash</span>
-                                <span className="ml-auto text-[9px] font-bold px-1.5 py-0.5 rounded" style={{ background: 'rgba(16,185,129,0.15)', color: '#10b981' }}>✓ LIVE</span>
                             </a>
                         </div>
-                        <p className="text-slate-500 text-[10px] mt-2">Paste your address → request coins → wait ~1 min ✓</p>
                     </div>
                 </div>
             )}
-
-            <div className="rounded-xl p-3 mb-5" style={{ background: 'rgba(16,185,129,0.06)', border: '1px solid rgba(16,185,129,0.15)' }}>
-                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Sending to Project</p>
-                <p className="text-emerald-300 text-xs font-mono break-all">
-                    {PROJECT_ADDRESS}
-                </p>
-            </div>
 
             <div className="space-y-3">
                 <div className="relative">
@@ -347,7 +347,7 @@ export default function WalletPanel({ onRealFund, onWalletConnect }) {
                     className="w-full py-3.5 rounded-xl font-bold text-white gradient-btn-green flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
                 >
                     {sendLoading ? (
-                        <><Spinner /> Broadcasting Transaction…</>
+                        <><Spinner /> Broadcasting…</>
                     ) : (
                         <>
                             <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
@@ -369,14 +369,12 @@ export default function WalletPanel({ onRealFund, onWalletConnect }) {
                     onClick={handleDisconnect}
                     className="text-slate-500 hover:text-slate-400 text-xs font-medium transition-colors"
                 >
-                    Disconnect & clear wallet
+                    Disconnect & clear session
                 </button>
             </div>
         </div>
     )
 }
-
-// ─── Sub-components ──────────────────────────────────────────────────────────
 
 function ErrorBox({ message, onClose }) {
     return (
@@ -405,7 +403,6 @@ function TxSuccess({ txId, amount }) {
                 href={url}
                 target="_blank"
                 rel="noreferrer"
-                id="view-tx-explorer-link"
                 className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors"
                 style={{ background: 'rgba(16,185,129,0.15)', color: '#10b981', border: '1px solid rgba(16,185,129,0.3)' }}
             >
