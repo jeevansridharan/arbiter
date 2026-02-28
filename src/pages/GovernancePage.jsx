@@ -56,9 +56,13 @@ export default function GovernancePage() {
                 // We keep stats at 0 until a wallet is connected in the session.
 
                 // 1. Fetch Global Voting Stats from Supabase (Discovery cache)
-                const { count: dbVotesCount } = await supabase
-                    .from('votes')
-                    .select('*', { count: 'exact', head: true })
+                let dbVotesCount = 0
+                if (supabase) {
+                    const { count } = await supabase
+                        .from('votes')
+                        .select('*', { count: 'exact', head: true })
+                    dbVotesCount = count || 0
+                }
 
                 // 2. Mock Global Approved Stats (To be replaced by on-chain scan summary)
                 const totalCount = 12
