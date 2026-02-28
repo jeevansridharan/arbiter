@@ -133,10 +133,10 @@ export default function ProfilePage() {
                     </h2>
                 </div>
                 {[
-                    'Non-Custodial: Your private keys are NEVER stored in the browser (localStorage).',
-                    'Session-Only: Private keys exist only in computer memory for the current session.',
+                    'Non-Custodial: Your private keys are stored securely in your browser\'s local storage.',
+                    'Persistent: Your wallet stays active across page refreshes and browser restarts.',
                     'This is a TESTNET wallet. Do not send real BCH to these addresses.',
-                    'Identity Persistence: Refreshing or closing the tab will clear your wallet access.',
+                    'Identity Persistence: To remove the wallet, you must click the Disconnect button.',
                 ].map((note, i) => (
                     <p key={i} style={{ color: '#64748b', fontSize: '0.8rem', lineHeight: 1.7 }}>• {note}</p>
                 ))}
@@ -153,7 +153,7 @@ export default function ProfilePage() {
                         display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', transition: 'all 0.2s',
                     }}
                 >
-                    <LogOut size={16} /> Disconnect &amp; Clear Session
+                    <LogOut size={16} /> Disconnect &amp; Remove Wallet
                 </button>
             )}
         </div>

@@ -8,7 +8,7 @@
  *  - Transaction hash display + explorer link
  */
 
-import React, { useState, useCallback } from 'react'
+import React, { useState, useCallback, useEffect } from 'react'
 import {
     initializeWallet,
     getBalance,
@@ -62,6 +62,18 @@ export default function WalletPanel({ onRealFund, onWalletConnect }) {
             setBalanceLoading(false)
         }
     }, [wallet])
+
+    // ── Auto-connect on mount ─────────────────────────────────────────────────
+    useEffect(() => {
+        const checkExisting = async () => {
+            const storedWif = localStorage.getItem('milestara_chipnet_wif')
+            if (storedWif && !wallet) {
+                console.log('[WalletPanel] Found stored WIF, auto-connecting...')
+                handleConnect()
+            }
+        }
+        checkExisting()
+    }, []) // only once on mount
 
     // ── Connect wallet ────────────────────────────────────────────────────────
     const handleConnect = async (isImport = false) => {
@@ -145,7 +157,7 @@ export default function WalletPanel({ onRealFund, onWalletConnect }) {
                     </div>
                     <div>
                         <h2 className="text-white font-bold text-base">Bitcoin Cash Wallet</h2>
-                        <p className="text-slate-500 text-xs">Chipnet (Testnet · Non-Custodial)</p>
+                        <p className="text-slate-500 text-xs">Chipnet (Testnet · Persistent)</p>
                     </div>
                     <div className="ml-auto flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold" style={{ background: 'rgba(100,116,139,0.12)', border: '1px solid rgba(100,116,139,0.2)', color: '#94a3b8' }}>
                         <div className="w-1.5 h-1.5 rounded-full bg-slate-500"></div>
@@ -155,7 +167,7 @@ export default function WalletPanel({ onRealFund, onWalletConnect }) {
 
                 <div className="space-y-4">
                     <div className="p-4 rounded-xl" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
-                        <p className="text-slate-400 text-xs mb-3 font-semibold uppercase tracking-wider">Session-Only Import (Safe)</p>
+                        <p className="text-slate-400 text-xs mb-3 font-semibold uppercase tracking-wider">Secure Import (Stored Locally)</p>
                         <input
                             type="password"
                             placeholder="Enter Wallet WIF (starts with c...)"
@@ -183,13 +195,13 @@ export default function WalletPanel({ onRealFund, onWalletConnect }) {
                         disabled={connectLoading}
                         className="w-full py-3.5 rounded-xl font-bold text-slate-300 hover:text-white transition-all flex items-center justify-center gap-2 border border-slate-700 hover:border-emerald-500/50 bg-slate-400/5"
                     >
-                        {connectLoading ? <><Spinner /> Generating…</> : 'Generate New Session Wallet'}
+                        {connectLoading ? <><Spinner /> Generating…</> : 'Generate New Persistent Wallet'}
                     </button>
                 </div>
 
                 <p className="text-slate-500 text-[10px] mt-4 text-center leading-relaxed">
-                    Personal keys are never stored in your browser. <br />
-                    Refreshing the page will clear the session wallet.
+                    Personal keys are stored securely in your browser's local storage.<br />
+                    They will stay until you click "Disconnect & clear session".
                 </p>
 
                 {error && <ErrorBox message={error} onClose={clearError} />}
@@ -207,7 +219,7 @@ export default function WalletPanel({ onRealFund, onWalletConnect }) {
                 </div>
                 <div>
                     <h2 className="text-white font-bold text-base">Bitcoin Cash Wallet</h2>
-                    <p className="text-slate-500 text-xs">Chipnet (Testnet · Active Session)</p>
+                    <p className="text-slate-500 text-xs">Chipnet (Testnet · Active Wallet)</p>
                 </div>
                 <div className="ml-auto flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold" style={{ background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.25)', color: '#10b981' }}>
                     <div className="w-1.5 h-1.5 rounded-full bg-emerald-400" style={{ boxShadow: '0 0 5px rgba(52,211,153,0.9)' }}></div>
@@ -369,7 +381,7 @@ export default function WalletPanel({ onRealFund, onWalletConnect }) {
                     onClick={handleDisconnect}
                     className="text-slate-500 hover:text-slate-400 text-xs font-medium transition-colors"
                 >
-                    Disconnect & clear session
+                    Disconnect & remove from this browser
                 </button>
             </div>
         </div>

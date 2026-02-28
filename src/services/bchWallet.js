@@ -63,12 +63,24 @@ export async function initializeWallet(wif = null) {
     let wallet
 
     try {
+        // 1. If no WIF provided, check localStorage
+        if (!wif) {
+            wif = localStorage.getItem(WALLET_STORAGE_KEY)
+        }
+
         if (wif) {
-            console.log('[bchWallet] Initializing wallet from provided WIF...')
+            console.log('[bchWallet] Initializing wallet from WIF (stored or provided)...')
             wallet = await TestNetWallet.fromWIF(wif)
         } else {
-            console.log('[bchWallet] Creating new random chipnet wallet (Session Only)...')
+            console.log('[bchWallet] Creating new random chipnet wallet...')
             wallet = await TestNetWallet.newRandom()
+            // 2. Persist new random wallet
+            localStorage.setItem(WALLET_STORAGE_KEY, wallet.privateKeyWif)
+        }
+
+        // 3. Always save current WIF to ensure persistence if it was imported manually
+        if (wif) {
+            localStorage.setItem(WALLET_STORAGE_KEY, wif)
         }
 
         console.log('[bchWallet] Wallet Address:', wallet.cashaddr)
@@ -147,7 +159,8 @@ export async function fundProject(wallet, amountBch) {
 // ─── Utility Functions ───────────────────────────────────────────────────────
 
 export function disconnectWallet() {
-    console.log('[bchWallet] Wallet session cleared.')
+    localStorage.removeItem(WALLET_STORAGE_KEY)
+    console.log('[bchWallet] Wallet session cleared from storage.')
 }
 
 export function getExplorerUrl(txId) {
