@@ -20,24 +20,27 @@
 //   • funderPk  – Public key of the person who funded (for refund path).
 // ─────────────────────────────────────────────────────────────────────────────
 
-pragma cashscript ^0.10.0;
+pragma cashscript ^0.13.0;
 
 contract MilestoneLock(
     pubkey ownerPk,    // project team's public key
     pubkey funderPk    // backer's public key (for refund)
 ) {
+
     // ── FUNCTION 1: release ──────────────────────────────────────────────────
     // The project OWNER signs to withdraw funds.
     // In our Week 3 demo, the JS layer only calls this after >50% YES votes.
     // The contract itself just verifies the owner's signature — the governance
     // rule lives in the frontend service (milestone approval gate).
     function release(sig ownerSig) {
+        require(ownerPk != funderPk);
         require(checkSig(ownerSig, ownerPk));
     }
 
     // ── FUNCTION 2: refund ───────────────────────────────────────────────────
     // The FUNDER can reclaim their BCH at any time (safety valve for demo).
     function refund(sig funderSig) {
+        require(ownerPk != funderPk);
         require(checkSig(funderSig, funderPk));
     }
 }
