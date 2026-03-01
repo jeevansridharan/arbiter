@@ -5,7 +5,7 @@
 
 import React, { useState, useEffect } from 'react'
 import { Copy, CheckCircle, Wallet, Shield, ExternalLink, LogOut } from 'lucide-react'
-import { initializeWallet, disconnectWallet } from '../services/bchWallet'
+import { initializeWallet, getBalance, disconnectWallet } from '../services/bchWallet'
 import { getLockedAmount } from '../services/milestoneContract'
 
 // ── Info row ──────────────────────────────────────────────────────────────────
@@ -24,15 +24,32 @@ function InfoRow({ label, value, mono = false, color = '#94a3b8' }) {
 export default function ProfilePage() {
     const [address, setAddress] = useState('')
     const [copied, setCopied] = useState(false)
+    const [balance, setBalance] = useState(0)
     const [tokens, setTokens] = useState(0)
     const [locked, setLocked] = useState(0)
     const [loading, setLoading] = useState(false)
 
     useEffect(() => {
-        // In the production model, we don't auto-load from localStorage.
-        // If there's a wallet in the current session (to-do: use global context),
-        // we display it. For now, we keep it empty until user connects.
-        setLocked(getLockedAmount())
+        const loadConnectedWallet = async () => {
+            const storedWif = localStorage.getItem('milestara_chipnet_wif')
+            if (storedWif) {
+                setLoading(true)
+                try {
+                    const wallet = await initializeWallet(storedWif)
+                    setAddress(wallet.cashaddr)
+                    const bal = await getBalance(wallet)
+                    setBalance(bal)
+                    // If your wallet object carries tokens, you can set them here
+                    // setTokens(wallet.tokens ? Number(wallet.tokens) : 0)
+                } catch (err) {
+                    console.error('[ProfilePage] Failed to reconnect wallet:', err)
+                } finally {
+                    setLoading(false)
+                }
+            }
+            setLocked(getLockedAmount())
+        }
+        loadConnectedWallet()
     }, [])
 
     const handleCopy = () => {
@@ -83,6 +100,7 @@ export default function ProfilePage() {
                 {address ? (
                     <>
                         <InfoRow label="Wallet Address" value={address} mono color="#10b981" />
+                        <InfoRow label="BCH Balance" value={`${balance.toFixed(8)} BCH`} color="#10b981" />
                         <InfoRow label="Network" value="Bitcoin Cash Chipnet (Testnet)" color="#34d399" />
                         <InfoRow label="Session GOV Tokens" value={`${tokens} tokens`} color="#10b981" />
                         <InfoRow label="Locked BCH" value={`${locked.toFixed(8)} BCH`} color="#34d399" />
