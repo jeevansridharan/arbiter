@@ -12,6 +12,9 @@
 
 import { TestNetWallet, toBch, Connection } from 'mainnet-js'
 
+// --- Governance Category ID (Shared) ---
+export const GOV_TOKEN_CATEGORY_ID = '9da68991a0c7c647565c567540a02d41549dad1182284730b9a92e21d7a4c651'
+
 // ─── Constants ───────────────────────────────────────────────────────────────
 
 /**
@@ -122,6 +125,25 @@ export async function getBalance(wallet) {
         return bchBalance
     } catch (err) {
         console.error('[bchWallet] Failed to fetch balance:', err.message)
+        return 0
+    }
+}
+
+/**
+ * getTokenBalance(wallet)
+ * 
+ * Sums all fungible GOV tokens in the wallet's UTXOs.
+ */
+export async function getTokenBalance(wallet) {
+    if (!wallet) return 0
+
+    try {
+        await wallet.getUtxos()
+        const tokenBalance = await wallet.getTokenBalance(GOV_TOKEN_CATEGORY_ID)
+        console.log('[bchWallet] GOV Token Balance (BigInt):', tokenBalance.toString())
+        return Number(tokenBalance)
+    } catch (err) {
+        console.error('[bchWallet] Failed to fetch token balance:', err.message)
         return 0
     }
 }

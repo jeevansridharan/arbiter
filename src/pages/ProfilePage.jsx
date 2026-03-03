@@ -5,8 +5,9 @@
 
 import React, { useState, useEffect } from 'react'
 import { Copy, CheckCircle, Wallet, Shield, ExternalLink, LogOut } from 'lucide-react'
-import { initializeWallet, getBalance, disconnectWallet } from '../services/bchWallet'
+import { initializeWallet, getBalance, getTokenBalance, disconnectWallet } from '../services/bchWallet'
 import { getLockedAmount } from '../services/milestoneContract'
+import { transferGovTokens } from '../services/govService'
 
 // ── Info row ──────────────────────────────────────────────────────────────────
 function InfoRow({ label, value, mono = false, color = '#94a3b8' }) {
@@ -29,6 +30,12 @@ export default function ProfilePage() {
     const [locked, setLocked] = useState(0)
     const [loading, setLoading] = useState(false)
 
+    // Token transfer state
+    const [recipient, setRecipient] = useState('')
+    const [sendAmount, setSendAmount] = useState('')
+    const [txLoading, setTxLoading] = useState(false)
+    const [txStatus, setTxStatus] = useState({ type: '', msg: '', txId: '' })
+
     useEffect(() => {
         const loadConnectedWallet = async () => {
             const storedWif = localStorage.getItem('milestara_chipnet_wif')
@@ -39,8 +46,9 @@ export default function ProfilePage() {
                     setAddress(wallet.cashaddr)
                     const bal = await getBalance(wallet)
                     setBalance(bal)
-                    // If your wallet object carries tokens, you can set them here
-                    // setTokens(wallet.tokens ? Number(wallet.tokens) : 0)
+
+                    const tks = await getTokenBalance(wallet)
+                    setTokens(tks)
                 } catch (err) {
                     console.error('[ProfilePage] Failed to reconnect wallet:', err)
                 } finally {
@@ -173,6 +181,97 @@ export default function ProfilePage() {
                 >
                     <LogOut size={16} /> Disconnect &amp; Remove Wallet
                 </button>
+            )}
+
+            {/* ── Token Transfer Section ────────────────────────────────────────── */}
+            {address && (
+                <div style={{ background: 'rgba(15,17,35,0.85)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '16px', padding: '24px', backdropFilter: 'blur(20px)', marginTop: '20px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
+                        <CheckCircle size={16} color="#10b981" />
+                        <h2 style={{ color: '#f1f5f9', fontWeight: 700, fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                            Send GOV Tokens
+                        </h2>
+                    </div>
+
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                            <label style={{ color: '#475569', fontSize: '0.72rem', fontWeight: 600, textTransform: 'uppercase' }}>Recipient Address</label>
+                            <input
+                                type="text"
+                                placeholder="bchtest:..."
+                                value={recipient}
+                                onChange={(e) => setRecipient(e.target.value)}
+                                style={{
+                                    background: 'rgba(15,17,35,0.6)', border: '1px solid rgba(255,255,255,0.08)',
+                                    borderRadius: '10px', padding: '10px 14px', color: '#f1f5f9', fontSize: '0.85rem', outline: 'none'
+                                }}
+                            />
+                        </div>
+
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                            <label style={{ color: '#475569', fontSize: '0.72rem', fontWeight: 600, textTransform: 'uppercase' }}>Amount (GOV)</label>
+                            <input
+                                type="number"
+                                placeholder="0"
+                                value={sendAmount}
+                                onChange={(e) => setSendAmount(e.target.value)}
+                                style={{
+                                    background: 'rgba(15,17,35,0.6)', border: '1px solid rgba(255,255,255,0.08)',
+                                    borderRadius: '10px', padding: '10px 14px', color: '#f1f5f9', fontSize: '0.85rem', outline: 'none'
+                                }}
+                            />
+                        </div>
+
+                        <button
+                            onClick={async () => {
+                                if (!recipient || !sendAmount || txLoading) return
+                                setTxLoading(true)
+                                setTxStatus({ type: '', msg: '', txId: '' })
+                                try {
+                                    const wallet = await initializeWallet()
+                                    const res = await transferGovTokens(wallet, recipient, parseInt(sendAmount))
+                                    setTxStatus({ type: 'success', msg: `Sent ${sendAmount} tokens!`, txId: res.txId })
+                                    setSendAmount('')
+                                    // Refresh balance
+                                    const tks = await getTokenBalance(wallet)
+                                    setTokens(tks)
+                                } catch (err) {
+                                    setTxStatus({ type: 'error', msg: err.message })
+                                } finally {
+                                    setTxLoading(false)
+                                }
+                            }}
+                            disabled={txLoading || !recipient || !sendAmount}
+                            style={{
+                                width: '100%', padding: '12px', borderRadius: '12px', cursor: 'pointer',
+                                background: 'linear-gradient(135deg, #10b981, #059669)', border: 'none',
+                                color: '#fff', fontWeight: 700, fontSize: '0.875rem',
+                                opacity: (txLoading || !recipient || !sendAmount) ? 0.5 : 1, transition: 'all 0.2s',
+                                marginTop: '8px'
+                            }}
+                        >
+                            {txLoading ? 'Broadcasting...' : 'Transfer Tokens'}
+                        </button>
+
+                        {txStatus.msg && (
+                            <div style={{
+                                marginTop: '12px', padding: '10px', borderRadius: '8px', fontSize: '0.8rem',
+                                background: txStatus.type === 'success' ? 'rgba(16,185,129,0.1)' : 'rgba(239,68,68,0.1)',
+                                border: `1px solid ${txStatus.type === 'success' ? 'rgba(16,185,129,0.3)' : 'rgba(239,68,68,0.3)'}`,
+                                color: txStatus.type === 'success' ? '#10b981' : '#f87171'
+                            }}>
+                                {txStatus.msg}
+                                {txStatus.txId && (
+                                    <div style={{ marginTop: '4px' }}>
+                                        <a href={`https://chipnet.imaginary.cash/tx/${txStatus.txId}`} target="_blank" rel="noreferrer" style={{ color: '#10b981', textDecoration: 'underline' }}>
+                                            View TX ↗
+                                        </a>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                    </div>
+                </div>
             )}
         </div>
     )

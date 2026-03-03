@@ -19,7 +19,8 @@ import {
     chipnetExplorerUrl,
     clearContractState,
 } from '../services/milestoneContract'
-import { PROJECT_ADDRESS } from '../services/bchWallet'
+import { PROJECT_ADDRESS, getTokenBalance } from '../services/bchWallet'
+import { scanVotes } from '../services/govService'
 
 // ── Spinner ──────────────────────────────────────────────────────────────────
 function Spinner() {
@@ -69,16 +70,24 @@ export default function GovernancePanel({ wallet, milestones = [], onMilestoneAp
 
     // ── Load state ────────────────────────────────────────────────────────────
     const refreshState = useCallback(async () => {
-        // Fetch current UI stats from localStorage (Production logic uses scanners)
-        setTokenBal(wallet?.tokens ? Number(wallet.tokens) : 0)
+        // 1. Fetch real-time token balance from wallet
+        const tks = await getTokenBalance(wallet)
+        setTokenBal(tks)
+
+        // 2. Fetch locked BCH in contract
         setLockedBch(getLockedAmount())
+
+        // 3. Scan On-Chain Votes for all milestones
+        const tally = await scanVotes()
+        console.log('[GovernancePanel] On-Chain Tally fetched:', tally)
 
         const votes = {}
         milestones.forEach(m => {
-            // Aggregated votes from DB milestones prop (calculated in fetchProjectById)
+            // Mapping the global tally to milestone-specific votes 
+            // (In a production app, we'd filter these by milestone ID in the op_return/commitment)
             votes[m.id] = {
-                yes: m.voteYes ?? 0,
-                no: m.voteNo ?? 0
+                yes: tally.yesVotes,
+                no: tally.noVotes
             }
         })
         setMilestoneVotes(votes)

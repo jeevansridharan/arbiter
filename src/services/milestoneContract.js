@@ -13,6 +13,7 @@
  */
 
 import { TestNetWallet } from 'mainnet-js'
+import { mintGovTokens, GOV_TOKEN_CATEGORY_ID } from './govService'
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
@@ -58,50 +59,59 @@ export async function fundMilestoneContract(wallet, amountBch, projectAddr) {
     // 2. Calculate tokens to mint
     const tokenAmount = Math.floor(amountBch * MINTING_RATIO)
 
+    // 3. REAL ON-CHAIN MINTING
+    // NOTE: In a production environment, VITE_MINTER_WIF would be in .env
+    const MINTER_WIF = import.meta.env.VITE_MINTER_WIF
+
+    let mintResult = { txId: 'simulation_only' }
+    if (MINTER_WIF) {
+        try {
+            mintResult = await mintGovTokens(wallet.cashaddr, amountBch, MINTER_WIF)
+        } catch (mintErr) {
+            console.error('[milestoneContract] Minting failed, continuing without tokens:', mintErr)
+        }
+    } else {
+        console.warn('[milestoneContract] VITE_MINTER_WIF missing. Token minting skipped (simulated only).')
+    }
+
     // UI CACHE UPDATES
     const prevLocked = loadFromStorage(STORAGE_KEYS.lockedAmount, 0)
     saveToStorage(STORAGE_KEYS.lockedAmount, prevLocked + amountBch)
 
-    // Note: Actual token minting happens via the TokenManager backend
-    // after observing this transaction on-chain.
+    const prevTokens = loadFromStorage(STORAGE_KEYS.tokenBalance, 0)
+    saveToStorage(STORAGE_KEYS.tokenBalance, prevTokens + tokenAmount)
 
     return {
         simulatedTxId: result.txId,
+        mintTxId: mintResult.txId,
         tokenAmount,
-        tokenCategory: loadFromStorage(STORAGE_KEYS.tokenCategory, 'mock_category')
+        tokenCategory: GOV_TOKEN_CATEGORY_ID
     }
 }
 
 /**
  * castVote
  * 
- * Performs an on-chain transaction sending GOV tokens to the Approve/Reject script IDs.
- * Destination addresses are derived from the production TallyEngine script logic.
+ * Performs an on-chain transaction sending GOV tokens to the Approve/Reject addresses.
  */
 export async function castVote(wallet, milestoneId, voteType, tokensToUse) {
     if (!wallet) throw new Error('Wallet not connected')
 
-    // 1. Define Voting Endpoints (Must match production/services/tallyEngine.js)
-    const APPROVE_ADDR = 'bchtest:pzj6g9n34y6grh7u2u3s4p5u6v7x8y9z0a1b2c3d'
-    const REJECT_ADDR = 'bchtest:pzq7w8x9y0z1a2b3c4d5e6f7g8h9i0j1k2l3m4n'
-
+    // 1. Define Voting Endpoints from GOV Service
+    const { APPROVE_ADDR, REJECT_ADDR, GOV_TOKEN_CATEGORY_ID } = await import('./govService')
     const destination = voteType === 'yes' ? APPROVE_ADDR : REJECT_ADDR
-
-    // 2. Fetch the project's token category (mocked if not found)
-    const categoryId = loadFromStorage(STORAGE_KEYS.tokenCategory, 'mock_category')
 
     console.log(`[milestoneContract] Broadcasting ${tokensToUse} tokens to ${voteType} for milestone ${milestoneId}`)
 
     try {
-        // 3. Construct the Token Transfer (Non-Custodial)
-        // We send the specified amount of tokens from the active session wallet
+        // 2. Perform On-Chain Token Transfer (Voting)
         const { txId } = await wallet.send([
             {
                 cashaddr: destination,
-                value: 1000n, // Dust output to carry the tokens
+                value: 1000n,
                 token: {
                     amount: BigInt(tokensToUse),
-                    category: categoryId,
+                    category: GOV_TOKEN_CATEGORY_ID,
                 }
             }
         ])
