@@ -12,6 +12,8 @@ import ProgressBar from './ProgressBar'
 import MilestoneCard from './MilestoneCard'
 import WalletPanel from './WalletPanel'
 import GovernancePanel from './GovernancePanel'
+import { scanVotes } from '../services/govService'
+import { castVote } from '../services/milestoneContract'
 
 // ── Spinner Helper ─────────────────────────────────────────────────────────
 function LoadingSpinner() {
@@ -32,6 +34,7 @@ export default function Dashboard({ project: initialProject, onFund, onVote, onT
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState(null)
     const [connectedWallet, setConnectedWallet] = useState(null)
+    const [onChainTally, setOnChainTally] = useState({ yesVotes: 0, noVotes: 0, approvalPercentage: 0 })
 
     // ── Fetch Logic ──────────────────────────────────────────────────────────
 
@@ -43,18 +46,21 @@ export default function Dashboard({ project: initialProject, onFund, onVote, onT
      */
     const fetchProjectData = useCallback(async (isSilent = false) => {
         if (!isSilent) setLoading(true)
-        console.log(`[Dashboard] 🔄 Fetching latest project data for ID: ${initialProject.id}`)
+        console.log(`[Dashboard] 🔄 Refreshing project (DB) & Governance (On-Chain)...`)
 
         try {
+            // 1. Fetch DB state (raised amount, milestones meta)
             const { data, error: fetchError } = await fetchProjectById(initialProject.id)
             if (fetchError) throw fetchError
+            if (data) setProject(data)
 
-            if (data) {
-                console.log(`[Dashboard] ✓ Data fetched. Raised: ${data.raised_amount} BCH`)
-                setProject(data)
-            }
+            // 2. Fetch On-Chain Tally
+            const tally = await scanVotes()
+            setOnChainTally(tally)
+            console.log(`[Dashboard] ✓ On-Chain Tally: ${tally.yesVotes} YES / ${tally.noVotes} NO`)
+
         } catch (err) {
-            console.error('[Dashboard] Fetch error:', err.message)
+            console.error('[Dashboard] Sync error:', err.message)
             setError(err.message)
         } finally {
             if (!isSilent) setLoading(false)
@@ -86,6 +92,35 @@ export default function Dashboard({ project: initialProject, onFund, onVote, onT
     const handleGovApproval = useCallback((milestoneId) => {
         if (onVote) onVote(milestoneId, 'yes')
     }, [onVote])
+
+    /**
+     * handleMilestoneVote()
+     * 
+     * Consolidates DB and On-Chain voting.
+     * If wallet is connected, performs an on-chain GOV token transfer.
+     */
+    const handleMilestoneVote = async (milestoneId, type) => {
+        if (connectedWallet) {
+            console.log(`[Dashboard] Initiating On-Chain vote (${type}) for ${milestoneId}`)
+            try {
+                // Perform real blockchain transaction (1 token per vote by default from UI)
+                await castVote(connectedWallet, milestoneId, type, 1)
+
+                // Still notify parent (ProjectsPage) to record in DB if desired, 
+                // but wrap in try/catch to ignore the 409 conflict.
+                if (onVote) await onVote(milestoneId, type).catch(() => { })
+
+                // Refresh specifically the on-chain tally after a delay
+                setTimeout(() => fetchProjectData(true), 3000)
+            } catch (err) {
+                alert(`Blockchain vote failed: ${err.message}`)
+            }
+        } else {
+            // Web2 / DB fallback if not connected
+            if (onVote) await onVote(milestoneId, type)
+            await fetchProjectData(true)
+        }
+    }
 
     // ── Derived Values ────────────────────────────────────────────────────────
 
@@ -208,12 +243,16 @@ export default function Dashboard({ project: initialProject, onFund, onVote, onT
                         milestones.map((milestone, index) => (
                             <MilestoneCard
                                 key={milestone.id}
-                                milestone={milestone}
-                                index={index}
-                                onVote={async (id, type) => {
-                                    if (onVote) await onVote(id, type)
-                                    await fetchProjectData(true)
+                                milestone={{
+                                    ...milestone,
+                                    // Override UI votes with blockchain-weighted tally if available
+                                    onChainVotes: {
+                                        yes: onChainTally.yesVotes,
+                                        no: onChainTally.noVotes
+                                    }
                                 }}
+                                index={index}
+                                onVote={handleMilestoneVote}
                             />
                         ))
                     ) : (

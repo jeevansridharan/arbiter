@@ -3,10 +3,12 @@ import React from 'react'
 export default function MilestoneCard({ milestone, index, onVote }) {
     const { title, status, approved } = milestone
 
-    // Safe votes — DB milestones may not have a votes object at all
-    const votes = milestone.votes ?? { yes: milestone.voteYes ?? 0, no: milestone.voteNo ?? 0 }
+    // Source of Truth: On-Chain vs Database
+    // If onChainVotes exists (from a scan), we prioritize it as it represents real governance power.
+    const isOnChain = !!milestone.onChainVotes
+    const votes = milestone.onChainVotes ?? milestone.votes ?? { yes: milestone.voteYes ?? 0, no: milestone.voteNo ?? 0 }
 
-    // Approved if: DB flag set, status string says so, or local vote tally says so
+    // Approved if: DB flag set, status string says so, or vote tally says so
     const totalVotes = (votes.yes ?? 0) + (votes.no ?? 0)
     const isApproved =
         approved === true ||
@@ -39,7 +41,7 @@ export default function MilestoneCard({ milestone, index, onVote }) {
                         <p className="text-slate-500 text-xs mt-0.5">
                             {totalVotes === 0
                                 ? 'No votes cast yet'
-                                : `${totalVotes} vote${totalVotes !== 1 ? 's' : ''} cast`}
+                                : `${totalVotes.toLocaleString()} ${isOnChain ? 'Tokens' : 'Votes'} cast`}
                         </p>
                     </div>
                 </div>
@@ -93,10 +95,15 @@ export default function MilestoneCard({ milestone, index, onVote }) {
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M7 9l5 5 5-5M7 14l5 5 5-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
                     No
                     <span className="ml-1 px-2 py-0.5 rounded-full text-xs font-bold" style={{ background: 'rgba(0,0,0,0.25)' }}>
-                        {votes.no}
+                        {votes.no.toLocaleString()}
                     </span>
                 </button>
             </div>
+            {isOnChain && (
+                <p className="text-[10px] text-emerald-500/60 mt-3 text-center font-semibold tracking-tight">
+                    🔒 SECURED BY ON-CHAIN CASHTOKENS
+                </p>
+            )}
         </div>
     )
 }
