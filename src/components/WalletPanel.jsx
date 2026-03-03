@@ -56,7 +56,9 @@ export default function WalletPanel({ onRealFund, onWalletConnect }) {
         try {
             const bal = await getBalance(targetWallet)
             setBalance(bal)
+            console.log('[WalletPanel] Balance updated:', bal)
         } catch (e) {
+            console.error('[WalletPanel] Balance refresh failed:', e)
             setError('Could not fetch balance. Check Chipnet connection.')
         } finally {
             setBalanceLoading(false)
@@ -75,6 +77,19 @@ export default function WalletPanel({ onRealFund, onWalletConnect }) {
         checkExisting()
     }, []) // only once on mount
 
+    // ── Auto-refresh balance when wallet connects ─────────────────────────────
+    useEffect(() => {
+        if (wallet) {
+            console.log('[WalletPanel] Wallet connected, fetching balance...')
+            refreshBalance(wallet)
+            // Auto-refresh every 10 seconds while wallet is connected
+            const interval = setInterval(() => {
+                refreshBalance(wallet)
+            }, 10000)
+            return () => clearInterval(interval)
+        }
+    }, [wallet, refreshBalance])
+
     // ── Connect wallet ────────────────────────────────────────────────────────
     const handleConnect = async (isImport = false) => {
         clearError()
@@ -83,10 +98,11 @@ export default function WalletPanel({ onRealFund, onWalletConnect }) {
             const w = await initializeWallet(isImport ? wifInput : null)
             setWallet(w)
             setAddress(w.cashaddr)
-            await refreshBalance(w)
+            console.log('[WalletPanel] Wallet connected:', w.cashaddr)
+            // Balance will be fetched by useEffect when wallet state updates
             if (onWalletConnect) onWalletConnect(w)
         } catch (e) {
-            console.error(e)
+            console.error('[WalletPanel] Connection failed:', e)
             setError('Failed to initialize wallet: ' + e.message)
         } finally {
             setConnectLoading(false)
@@ -128,10 +144,12 @@ export default function WalletPanel({ onRealFund, onWalletConnect }) {
             const hash = await fundProject(wallet, parsed)
             setTxId(hash)
             setTxStatus('success')
+            console.log('[WalletPanel] Transaction successful:', hash)
             if (onRealFund) onRealFund(parsed, hash)
-            await refreshBalance()
+            // Give blockchain some time to process, then refresh balance
+            setTimeout(() => refreshBalance(), 2000)
         } catch (e) {
-            console.error(e)
+            console.error('[WalletPanel] Funding failed:', e)
             setTxStatus('error')
             setError(e.message || 'Transaction failed.')
         } finally {
