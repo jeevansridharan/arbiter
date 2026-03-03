@@ -40,7 +40,7 @@ import { supabase, supabaseConfigured } from '../lib/supabase'
 import { createProject, deleteProject, updateRaisedAmount } from '../lib/db/projects'
 import { insertTransaction } from '../lib/db/transactions'
 import { createMilestoneBatch } from '../lib/db/milestones'
-import { voteOnMilestone } from '../lib/db/votes'
+import { voteOnMilestone, hasUserVoted } from '../lib/db/votes'
 import ProjectCard from '../components/ProjectCard'
 import ProjectForm from '../components/ProjectForm'
 import Dashboard from '../components/Dashboard'
@@ -231,33 +231,38 @@ export default function ProjectsPage() {
     const handleFund = (amount, txHash, walletAddress) => handleTransaction(amount, txHash, 'funding', walletAddress)
 
     const handleVote = async (milestoneId, voteType) => {
-        // BUG FIX: Write vote to Supabase database.
-        // Previously only updated local React state — votes were lost on refresh
-        // and never counted for governance.
+        // Resolve stable anonymous voter ID from localStorage
+        const key = 'milestara_anon_voter_id'
+        let voterId = localStorage.getItem(key)
+        if (!voterId) {
+            voterId = 'anon_' + Math.random().toString(36).slice(2) + Date.now().toString(36)
+            localStorage.setItem(key, voterId)
+        }
+
+        // ── Pre-check: has this wallet already voted on this milestone? ──────
+        const alreadyVoted = await hasUserVoted(milestoneId, voterId)
+        if (alreadyVoted) {
+            console.info('[ProjectsPage] User has already voted on milestone:', milestoneId)
+            alert('You have already voted on this milestone.')
+            return  // ← exit early, no 409 request, no double-count
+        }
+
+        // ── Insert vote into Supabase ────────────────────────────────────────
         try {
             await voteOnMilestone({
                 milestoneId,
-                // Use a stable anonymous voter ID from localStorage so the
-                // UNIQUE(milestone_id, voter_id) constraint is respected
-                voterId: (() => {
-                    const key = 'milestara_anon_voter_id'
-                    let id = localStorage.getItem(key)
-                    if (!id) {
-                        id = 'anon_' + Math.random().toString(36).slice(2) + Date.now().toString(36)
-                        localStorage.setItem(key, id)
-                    }
-                    return id
-                })(),
+                voterId,
                 vote: voteType === 'yes',
                 votingPower: 1,
             })
             console.log(`[ProjectsPage] ✓ Vote '${voteType}' recorded in DB for milestone:`, milestoneId)
         } catch (voteErr) {
-            // Still update local state optimistically so UI feels responsive
-            console.warn('[ProjectsPage] DB vote failed (may already have voted):', voteErr.message)
+            console.warn('[ProjectsPage] DB vote failed:', voteErr.message)
+            alert(voteErr.message || 'Vote failed. Please try again.')
+            return  // ← don't update local state if the vote wasn't saved
         }
 
-        // Always update local state for immediate feedback
+        // ── Update local state only after a successful DB write ──────────────
         setActiveProject(prev => ({
             ...prev,
             milestones: prev.milestones?.map(m => {
