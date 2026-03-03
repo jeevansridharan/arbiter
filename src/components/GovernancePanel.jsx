@@ -264,7 +264,11 @@ export default function GovernancePanel({ wallet, milestones = [], onMilestoneAp
                         {milestones.map((m, idx) => {
                             const votes = milestoneVotes[m.id] || { yes: 0, no: 0 }
                             const total = votes.yes + votes.no
-                            const approved = total > 0 && (votes.yes / total) > 0.5
+                            // Check DB approval flag OR status string OR on-chain tally
+                            const approved =
+                                m.approved === true ||
+                                m.status === 'Approved' || m.status === 'approved' ||
+                                (total > 0 && (votes.yes / total) > 0.5)
                             const txId = releaseTxId[m.id]
 
                             return (
