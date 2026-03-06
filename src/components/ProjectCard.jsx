@@ -41,6 +41,14 @@ function formatDate(isoString) {
 }
 
 /**
+ * Strips the [On-Chain Address: ...] tag from the description for display.
+ */
+function cleanDescription(text) {
+    if (!text) return ''
+    return text.replace(/\[On-Chain Address: bchtest:[^\]]+\]/g, '').trim()
+}
+
+/**
  * Returns the correct badge color based on the project status string.
  */
 function statusStyle(status) {
@@ -127,7 +135,7 @@ export default function ProjectCard({ project, onView, onDelete }) {
                 color: '#64748b', fontSize: '0.83rem', lineHeight: 1.6, margin: 0,
                 display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden',
             }}>
-                {description || 'No description provided.'}
+                {cleanDescription(description) || 'No description provided.'}
             </p>
 
             {/* ── Progress bar ── */}

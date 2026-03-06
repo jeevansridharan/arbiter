@@ -54,8 +54,8 @@ export default function Dashboard({ project: initialProject, onFund, onVote, onT
             if (fetchError) throw fetchError
             if (data) setProject(data)
 
-            // 2. Fetch On-Chain Tally
-            const tally = await scanVotes()
+            // 2. Fetch On-Chain Tally — scoped to THIS project's voting addresses
+            const tally = await scanVotes(initialProject.id)
             setOnChainTally(tally)
             console.log(`[Dashboard] ✓ On-Chain Tally: ${tally.yesVotes} YES / ${tally.noVotes} NO`)
 
@@ -103,8 +103,9 @@ export default function Dashboard({ project: initialProject, onFund, onVote, onT
         if (connectedWallet) {
             console.log(`[Dashboard] Initiating On-Chain vote (${type}) for ${milestoneId}`)
             try {
-                // Perform real blockchain transaction (1 token per vote by default from UI)
-                await castVote(connectedWallet, milestoneId, type, 1)
+                // Perform real blockchain transaction — passing projectId so the
+                // vote lands at this project's unique Approve/Reject address
+                await castVote(connectedWallet, initialProject.id, milestoneId, type, 1)
 
                 // Still notify parent (ProjectsPage) to record in DB if desired, 
                 // but wrap in try/catch to ignore the 409 conflict.
@@ -134,6 +135,12 @@ export default function Dashboard({ project: initialProject, onFund, onVote, onT
     const approvedCount = milestones.filter(
         m => m.approved === true || m.status === 'Approved' || m.status === 'approved'
     ).length
+
+    // Strips the [On-Chain Address: ...] tag from the description for display.
+    const cleanDescription = (text) => {
+        if (!text) return ''
+        return text.replace(/\[On-Chain Address: bchtest:[^\]]+\]/g, '').trim()
+    }
 
     // Fallback: If contract_address is null, try to extract it from the description
     const contract_address = project?.contract_address || (project?.description?.includes('[On-Chain Address: ')
@@ -207,7 +214,7 @@ export default function Dashboard({ project: initialProject, onFund, onVote, onT
             <div className="card-glass rounded-2xl p-8 mb-6">
                 <div className="mb-6">
                     <h2 className="text-xs font-semibold uppercase tracking-widest text-slate-500 mb-2">About</h2>
-                    <p className="text-slate-300 leading-relaxed">{description}</p>
+                    <p className="text-slate-300 leading-relaxed">{cleanDescription(description)}</p>
                 </div>
                 <hr className="section-divider" />
                 <ProgressBar current={fundedAmount} target={fundingTarget} />
@@ -225,6 +232,7 @@ export default function Dashboard({ project: initialProject, onFund, onVote, onT
             {/* ── Governance + Milestone Locking Panel ──────────────── */}
             <GovernancePanel
                 wallet={connectedWallet}
+                projectId={initialProject.id}
                 milestones={milestones}
                 onMilestoneApproved={handleGovApproval}
                 onTransaction={async (amt, hash, type) => {

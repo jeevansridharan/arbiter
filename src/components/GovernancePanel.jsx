@@ -54,7 +54,7 @@ function VoteBar({ votes }) {
 // ─────────────────────────────────────────────────────────────────────────────
 // MAIN COMPONENT
 // ─────────────────────────────────────────────────────────────────────────────
-export default function GovernancePanel({ wallet, milestones = [], onMilestoneApproved, onTransaction }) {
+export default function GovernancePanel({ wallet, projectId, milestones = [], onMilestoneApproved, onTransaction }) {
     // ── State ─────────────────────────────────────────────────────────────────
     const [tokenBal, setTokenBal] = useState(0)
     const [lockedBch, setLockedBch] = useState(0)
@@ -77,21 +77,19 @@ export default function GovernancePanel({ wallet, milestones = [], onMilestoneAp
         // 2. Fetch locked BCH in contract
         setLockedBch(getLockedAmount())
 
-        // 3. Scan On-Chain Votes for all milestones
-        const tally = await scanVotes()
+        // 3. Scan On-Chain Votes — scoped to this project's addresses
+        const tally = await scanVotes(projectId)
         console.log('[GovernancePanel] On-Chain Tally fetched:', tally)
 
         const votes = {}
         milestones.forEach(m => {
-            // Mapping the global tally to milestone-specific votes 
-            // (In a production app, we'd filter these by milestone ID in the op_return/commitment)
             votes[m.id] = {
                 yes: tally.yesVotes,
                 no: tally.noVotes
             }
         })
         setMilestoneVotes(votes)
-    }, [milestones, wallet?.cashaddr])
+    }, [milestones, wallet?.cashaddr, projectId])
 
     useEffect(() => { refreshState() }, [refreshState, milestones])
 
@@ -130,9 +128,8 @@ export default function GovernancePanel({ wallet, milestones = [], onMilestoneAp
         setError('')
         setVoteLoading(milestoneId + voteType)
         try {
-            // ON-CHAIN VOTING: Send tokens to Approve/Reject script 
-            // This is a physical blockchain transaction
-            const res = await castVote(wallet, milestoneId, voteType, voteTokens)
+            // ON-CHAIN VOTING: Send tokens to this project's Approve/Reject P2PKH address
+            const res = await castVote(wallet, projectId, milestoneId, voteType, voteTokens)
 
             if (res.txId) {
                 console.log(`[GovernancePanel] Vote TX Broadcasted: ${res.txId}`)

@@ -91,17 +91,28 @@ export async function fundMilestoneContract(wallet, amountBch, projectAddr) {
 
 /**
  * castVote
- * 
- * Performs an on-chain transaction sending GOV tokens to the Approve/Reject addresses.
+ *
+ * Performs an on-chain transaction sending GOV tokens to the project-specific
+ * Approve or Reject address.
+ *
+ * @param {object} wallet       — Connected mainnet-js wallet
+ * @param {string} projectId    — Supabase project UUID (used to derive addresses)
+ * @param {string} milestoneId  — Milestone identifier (for logging)
+ * @param {string} voteType     — 'yes' | 'no'
+ * @param {number} tokensToUse  — Number of GOV tokens to spend as votes
  */
-export async function castVote(wallet, milestoneId, voteType, tokensToUse) {
+export async function castVote(wallet, projectId, milestoneId, voteType, tokensToUse) {
     if (!wallet) throw new Error('Wallet not connected')
+    if (!projectId) throw new Error('castVote: projectId is required for per-project voting')
 
-    // 1. Define Voting Endpoints from GOV Service
-    const { APPROVE_ADDR, REJECT_ADDR, GOV_TOKEN_CATEGORY_ID } = await import('./govService')
-    const destination = voteType === 'yes' ? APPROVE_ADDR : REJECT_ADDR
+    // 1. Get this project's deterministic voting addresses
+    const { getProjectVotingAddresses, GOV_TOKEN_CATEGORY_ID } = await import('./govService')
+    const { approveAddr, rejectAddr } = await getProjectVotingAddresses(projectId)
+    const destination = voteType === 'yes' ? approveAddr : rejectAddr
 
-    console.log(`[milestoneContract] Broadcasting ${tokensToUse} tokens to ${voteType} for milestone ${milestoneId}`)
+    console.log(`[milestoneContract] Voting "${voteType}" on milestone ${milestoneId} (project: ${projectId})`)
+    console.log(`  Destination: ${destination}`)
+    console.log(`  Tokens to use: ${tokensToUse}`)
 
     try {
         // 2. Perform On-Chain Token Transfer (Voting)
@@ -116,7 +127,7 @@ export async function castVote(wallet, milestoneId, voteType, tokensToUse) {
             }
         ])
 
-        console.log(`[milestoneContract] Vote Broadcasted: ${txId}`)
+        console.log(`[milestoneContract] ✓ Vote Broadcasted: ${txId}`)
         return { success: true, txId }
     } catch (err) {
         console.error('[milestoneContract] Voting failed:', err)

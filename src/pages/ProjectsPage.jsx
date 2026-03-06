@@ -45,6 +45,7 @@ import ProjectCard from '../components/ProjectCard'
 import ProjectForm from '../components/ProjectForm'
 import Dashboard from '../components/Dashboard'
 import { deployMilestoneEscrow } from '../../production/scripts/deployContract'
+import { generateVotingAddresses } from '../../production/scripts/generateVotingAddresses'
 import { initializeWallet } from '../services/bchWallet'
 import * as libauth from '@bitauth/libauth'
 
@@ -168,7 +169,7 @@ export default function ProjectsPage() {
         console.log('[ProjectsPage] Deploying MilestoneEscrow on-chain...');
 
         // ── 4. Deploy Contract ────────────────────────────────────────────────
-        let contractAddress = 'bchtest:simulation_mode_address';
+        let contractAddress = '';
         try {
             const deployment = await deployMilestoneEscrow({
                 creatorPk,
@@ -183,13 +184,29 @@ export default function ProjectsPage() {
             console.error('[ProjectsPage] ✗ Deployment failed:', deployErr);
         }
 
-        // ── 5. Real Supabase INSERT ──────────────────────────────────────────────
+        // ── 5. Pre-generate Voting Addresses ──────────────────────────────────
+        // We don't have the projectId yet (it's assigned by Supabase), so we
+        // embed voting addresses in the description. After insert, we can use
+        // the real UUID returned from Supabase for future-address derivation.
+        // NOTE: The canonical per-project addresses are always derivable from
+        // the project UUID via generateVotingAddresses(projectId), so storing
+        // them here is just a convenience cache for the initial render.
+        console.log('[ProjectsPage] Voting addresses will be derived from project UUID after insert.');
+
+        // ── 6. Build description with on-chain metadata (fallback storage) ────
+        // This safely embeds the contract address even if the DB column is missing.
+        const metaTags = contractAddress
+            ? `\n\n[On-Chain Address: ${contractAddress}]`
+            : '';
+        const fullDescription = (projectData.description ?? '') + metaTags;
+
+        // ── 7. Real Supabase INSERT ───────────────────────────────────────────
         const { data: newProject, error: insertError } = await createProject({
             title: projectData.title,
-            description: projectData.description ?? '',
+            description: fullDescription,
             goal_amount: projectData.goal_amount,
             owner_wallet: wallet?.cashaddr ?? projectData.owner_wallet ?? PLACEHOLDER_WALLET,
-            contract_address: contractAddress, // ← New column
+            contract_address: contractAddress,
             status: 'active',
         })
 
