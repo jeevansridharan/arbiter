@@ -1,4 +1,4 @@
-pragma cashscript ^0.10.0;
+pragma cashscript ^0.12.0;
 
 /**
  * MilestoneEscrow.cash
@@ -19,7 +19,7 @@ contract MilestoneEscrow(
      * release()
      * Allows the creator to claim the funds if governance approval is reached.
      */
-    function release(sig creatorSig, sig oracleSig, bytes tallyProof) {
+    function release(sig creatorSig, datasig oracleSig, bytes tallyProof) {
         // 1. Verify the Tally Engine confirms this milestone passed governance
         // Proof format: [milestoneId (32 bytes)][status (1 byte: 0x01=Approved)]
         require(checkDataSig(oracleSig, tallyProof, tallyOraclePk));

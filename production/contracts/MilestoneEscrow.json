@@ -1,0 +1,95 @@
+{
+  "contractName": "MilestoneEscrow",
+  "constructorInputs": [
+    {
+      "name": "creatorPk",
+      "type": "pubkey"
+    },
+    {
+      "name": "funderPk",
+      "type": "pubkey"
+    },
+    {
+      "name": "tallyOraclePk",
+      "type": "pubkey"
+    },
+    {
+      "name": "milestoneId",
+      "type": "bytes32"
+    },
+    {
+      "name": "deadline",
+      "type": "int"
+    }
+  ],
+  "abi": [
+    {
+      "name": "release",
+      "inputs": [
+        {
+          "name": "creatorSig",
+          "type": "sig"
+        },
+        {
+          "name": "oracleSig",
+          "type": "datasig"
+        },
+        {
+          "name": "tallyProof",
+          "type": "bytes"
+        }
+      ]
+    },
+    {
+      "name": "refund",
+      "inputs": [
+        {
+          "name": "funderSig",
+          "type": "sig"
+        }
+      ]
+    }
+  ],
+  "bytecode": "OP_5 OP_PICK OP_0 OP_NUMEQUAL OP_IF OP_7 OP_ROLL OP_8 OP_PICK OP_4 OP_ROLL OP_CHECKDATASIGVERIFY OP_6 OP_ROLL OP_3 OP_ROLL OP_1 OP_CAT OP_EQUALVERIFY OP_DUP OP_HASH160 76a914 OP_SWAP OP_CAT 88ac OP_CAT OP_0 OP_OUTPUTBYTECODE OP_EQUALVERIFY OP_0 OP_OUTPUTVALUE OP_INPUTINDEX OP_UTXOVALUE e803 OP_SUB OP_GREATERTHANOREQUAL OP_VERIFY OP_4 OP_ROLL OP_SWAP OP_CHECKSIG OP_NIP OP_NIP OP_NIP OP_ELSE OP_5 OP_ROLL OP_1 OP_NUMEQUALVERIFY OP_4 OP_ROLL OP_CHECKLOCKTIMEVERIFY OP_DROP OP_4 OP_ROLL OP_ROT OP_CHECKSIG OP_NIP OP_NIP OP_NIP OP_ENDIF",
+  "source": "pragma cashscript ^0.12.0;\r\n\r\n/**\r\n * MilestoneEscrow.cash\r\n * \r\n * A non-custodial milestone escrow contract for Milestara.\r\n * Funds are locked until:\r\n * 1. Governance Approval: A Tally Oracle signs a proof of milestone completion.\r\n * 2. Refund: If a deadline passes, the funder can reclaim the funds.\r\n */\r\ncontract MilestoneEscrow(\r\n    pubkey creatorPk,      // Project creator who receives funds\r\n    pubkey funderPk,       // Funder who can refund if project stalls\r\n    pubkey tallyOraclePk,  // The Tally Engine public key (the \"Oracle\")\r\n    bytes32 milestoneId,   // Unique identifier for this milestone\r\n    int deadline           // Block height/timestamp for refund safety\r\n) {\r\n    /**\r\n     * release()\r\n     * Allows the creator to claim the funds if governance approval is reached.\r\n     */\r\n    function release(sig creatorSig, datasig oracleSig, bytes tallyProof) {\r\n        // 1. Verify the Tally Engine confirms this milestone passed governance\r\n        // Proof format: [milestoneId (32 bytes)][status (1 byte: 0x01=Approved)]\r\n        require(checkDataSig(oracleSig, tallyProof, tallyOraclePk));\r\n        require(tallyProof == milestoneId + 0x01);\r\n\r\n        // 2. Ensure the payout goes strictly to the Project Creator (P2PKH)\r\n        bytes20 creatorHash = hash160(creatorPk);\r\n        bytes creatorLock = new LockingBytecodeP2PKH(creatorHash);\r\n        \r\n        // Ensure the first output of the spending TX goes to the creator\r\n        // We allow for a small fee deduction (standard 1000 sats)\r\n        require(tx.outputs[0].lockingBytecode == creatorLock);\r\n        require(tx.outputs[0].value >= tx.inputs[this.activeInputIndex].value - 1000);\r\n\r\n        // 3. Verify creator actually wants to claim the funds\r\n        require(checkSig(creatorSig, creatorPk));\r\n    }\r\n\r\n    /**\r\n     * refund()\r\n     * Returns funds to the funder if the project doesn't meet its deadline.\r\n     */\r\n    function refund(sig funderSig) {\r\n        require(tx.time >= deadline);\r\n        require(checkSig(funderSig, funderPk));\r\n    }\r\n}\r\n",
+  "debug": {
+    "bytecode": "5579009c63577a5879547abb567a537a517e8876a90376a9147c7e0288ac7e00cd8800ccc0c602e80394a269547a7cac77777767557a519d547ab175547a7bac77777768",
+    "sourceMap": "22:4:39:5;;;;;25:29:25:38;;:40::50;;:52::65;;:8::68:1;26:16:26:26:0;;:30::41;;:44::48;:30:::1;:8::50;29:38:29:47:0;:30::48:1;30:28:30:65:0;:53::64;:28::65:1;;;34:27:34:28:0;:16::45:1;:8::62;35:27:35:28:0;:16::35:1;:49::70:0;:39::77:1;:80::84:0;:39:::1;:16;:8::86;38:25:38:35:0;;:37::46;:8::49:1;22:4:39:5;;;;45::48::0;;;;46:27:46:35;;:8::37:1;;47:25:47:34:0;;:36::44;:8::47:1;45:4:48:5;;;11:0:49:1",
+    "logs": [],
+    "requires": [
+      {
+        "ip": 16,
+        "line": 25
+      },
+      {
+        "ip": 23,
+        "line": 26
+      },
+      {
+        "ip": 33,
+        "line": 34
+      },
+      {
+        "ip": 41,
+        "line": 35
+      },
+      {
+        "ip": 46,
+        "line": 38
+      },
+      {
+        "ip": 56,
+        "line": 46
+      },
+      {
+        "ip": 62,
+        "line": 47
+      }
+    ]
+  },
+  "compiler": {
+    "name": "cashc",
+    "version": "0.12.1"
+  },
+  "updatedAt": "2026-03-06T03:53:37.432Z"
+}
