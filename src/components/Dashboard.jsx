@@ -135,6 +135,11 @@ export default function Dashboard({ project: initialProject, onFund, onVote, onT
         m => m.approved === true || m.status === 'Approved' || m.status === 'approved'
     ).length
 
+    // Fallback: If contract_address is null, try to extract it from the description
+    const contract_address = project?.contract_address || (project?.description?.includes('[On-Chain Address: ')
+        ? project.description.match(/\[On-Chain Address: (bchtest:[^\]]+)\]/)?.[1]
+        : null)
+
     // ── Render Logic ──────────────────────────────────────────────────────────
 
     if (loading && !project) return <LoadingSpinner />
@@ -152,6 +157,11 @@ export default function Dashboard({ project: initialProject, onFund, onVote, onT
                         Live Dashboard · Chipnet
                     </div>
                     <h1 className="text-3xl font-bold text-white">{title}</h1>
+                    {contract_address && (
+                        <p className="text-slate-500 text-xs mt-2 font-mono flex items-center gap-2">
+                            <span className="text-violet-400">🛡️ Contract:</span> {contract_address}
+                        </p>
+                    )}
                 </div>
                 <button
                     id="reset-project-btn"

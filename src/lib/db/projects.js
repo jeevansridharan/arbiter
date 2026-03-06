@@ -142,6 +142,7 @@ export async function createProject({
     description = '',
     goal_amount,
     owner_wallet,
+    contract_address = '',
     status = 'active',
 }) {
 
@@ -173,6 +174,7 @@ export async function createProject({
         goal_amount: Number(goal_amount),
         raised_amount: 0,              // always starts at 0
         owner_wallet: owner_wallet.trim(),
+        contract_address: contract_address,
         status,
         // created_at is auto-set by Supabase DEFAULT now()
     }
@@ -192,12 +194,26 @@ export async function createProject({
             .single()            // we inserted one row — unwrap from array
 
         if (error) {
-            console.error('[createProject] ✗ Supabase INSERT error:')
-            console.error('  code   :', error.code)
-            console.error('  message:', error.message)
-            console.error('  details:', error.details)
-            console.error('  hint   :', error.hint)
-            console.error('  full   :', error)
+            console.error('[createProject] ✗ Supabase INSERT error:', error.code, error.message)
+
+            // ── FALLBACK: If column contract_address is missing ─────────────
+            // Error codes: 42703 (Postgres) or PGRST204 (PostgREST schema cache)
+            if ((error.code === '42703' || error.code === 'PGRST204') && payload.contract_address) {
+                console.warn('[createProject] Column "contract_address" missing. Appending to description and retrying...')
+
+                const { contract_address, ...fallbackPayload } = payload
+                // Append contract info to description so it's not lost
+                const contractTag = `\n\n[On-Chain Address: ${contract_address}]`
+                fallbackPayload.description = (fallbackPayload.description + contractTag).trim()
+
+                const retry = await supabase.from(TABLE).insert([fallbackPayload]).select().single()
+                if (!retry.error) {
+                    console.info('[createProject] ✓ Fallback insert succeeded!')
+                    return retry
+                }
+                console.error('[createProject] ✗ Fallback also failed:', retry.error.message)
+            }
+
             return { data: null, error }
         }
 

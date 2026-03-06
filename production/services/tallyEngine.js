@@ -64,7 +64,8 @@ export async function generateApprovalSignature(milestoneId, oracleWif) {
     const status = '01';
     const messageHex = milestoneId.replace('0x', '') + status;
     const messageBytes = libauth.hexToBin(messageHex);
-    const messageHash = libauth.sha256(messageBytes);
+    const sha256 = await libauth.instantiateSha256();
+    const messageHash = sha256.hash(messageBytes);
 
     // 2. Decode Oracle WIF
     const wifResult = libauth.decodeWif(oracleWif);

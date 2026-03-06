@@ -1,16 +1,11 @@
 import { Contract, ElectrumNetworkProvider } from 'cashscript';
-import { createReadStream } from 'fs';
-import { readFileSync } from 'fs';
-import { fileURLToPath } from 'url';
-import path from 'path';
-
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
+import artifact from '../contracts/MilestoneEscrow.json';
 
 /**
  * deployMilestoneEscrow
  *
- * Compiles and instantiates the MilestoneEscrow CashScript contract
- * using the pre-compiled artifact (MilestoneEscrow.json).
+ * Instantiates the MilestoneEscrow CashScript contract
+ * using the bundled artifact (MilestoneEscrow.json).
  *
  * Returns the real P2SH contract address on Chipnet.
  */
@@ -23,14 +18,12 @@ export async function deployMilestoneEscrow(params) {
         deadlineHeight,  // number — block height after which refund is possible
     } = params;
 
-    // ── 1. Load the pre-compiled contract artifact ─────────────────────────────
-    const artifactPath = path.resolve(__dirname, '../contracts/MilestoneEscrow.json');
-    const artifact = JSON.parse(readFileSync(artifactPath, 'utf8'));
-
-    // ── 2. Connect to Chipnet ──────────────────────────────────────────────────
+    // ── 1. Connect to Chipnet ──────────────────────────────────────────────────
     const provider = new ElectrumNetworkProvider('chipnet');
 
-    // ── 3. Instantiate the contract with real constructor arguments ────────────
+    // ── 2. Instantiate the contract with real constructor arguments ────────────
+    // Note: ensure params are passed correctly to the constructor
+    // creatorPk, funderPk, tallyOraclePk, milestoneId, deadline
     const contract = new Contract(
         artifact,
         [creatorPk, funderPk, oraclePk, milestoneId, BigInt(deadlineHeight)],
@@ -38,13 +31,11 @@ export async function deployMilestoneEscrow(params) {
     );
 
     const address = contract.address;
-    console.log(`[Deploy] ✅ MilestoneEscrow deployed for milestone`);
-    console.log(`[Deploy]    Address : ${address}`);
-    console.log(`[Deploy]    TokenAddress: ${contract.tokenAddress}`);
+    console.log(`[Deploy] ✅ MilestoneEscrow initialized at: ${address}`);
 
     return {
-        address,          // The real Chipnet P2SH address — send BCH here to fund escrow
+        address,          // The real Chipnet P2SH address
         tokenAddress: contract.tokenAddress,
-        contract,         // The Contract instance (for building release/refund txs)
+        contract,         // The Contract instance
     };
 }

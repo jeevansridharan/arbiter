@@ -6,7 +6,7 @@
  */
 
 import React from 'react'
-import { Calendar, Target, TrendingUp, Wallet, ArrowRight, Trash2 } from 'lucide-react'
+import { Calendar, Target, TrendingUp, Wallet, ArrowRight, Trash2, Shield } from 'lucide-react'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -62,6 +62,7 @@ export default function ProjectCard({ project, onView, onDelete }) {
         goal_amount,
         raised_amount,
         owner_wallet,
+        contract_address,
         status,
         created_at,
     } = project
@@ -72,6 +73,13 @@ export default function ProjectCard({ project, onView, onDelete }) {
     const percent = goal > 0 ? Math.min((raised / goal) * 100, 100) : 0
 
     const badge = statusStyle(status)
+
+    // Fallback: If contract_address is null, try to extract it from the description
+    let displayAddress = contract_address
+    if (!displayAddress && description && description.includes('[On-Chain Address: ')) {
+        const match = description.match(/\[On-Chain Address: (bchtest:[^\]]+)\]/)
+        if (match) displayAddress = match[1]
+    }
 
     return (
         <div
@@ -174,6 +182,14 @@ export default function ProjectCard({ project, onView, onDelete }) {
                     <Wallet size={13} color="#06b6d4" />
                     <span style={{ fontSize: '0.72rem', color: '#475569', fontFamily: 'monospace' }}>
                         {shortWallet(owner_wallet)}
+                    </span>
+                </div>
+
+                {/* Contract address */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                    <Shield size={13} color="#a78bfa" />
+                    <span style={{ fontSize: '0.72rem', color: '#475569', fontFamily: 'monospace' }}>
+                        {displayAddress ? shortWallet(displayAddress) : 'No contract'}
                     </span>
                 </div>
 

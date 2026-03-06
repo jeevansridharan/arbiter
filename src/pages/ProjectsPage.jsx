@@ -44,11 +44,20 @@ import { voteOnMilestone, hasUserVoted } from '../lib/db/votes'
 import ProjectCard from '../components/ProjectCard'
 import ProjectForm from '../components/ProjectForm'
 import Dashboard from '../components/Dashboard'
+import { deployMilestoneEscrow } from '../../production/scripts/deployContract'
+import { initializeWallet } from '../services/bchWallet'
+import * as libauth from '@bitauth/libauth'
 
 // ── TODO: Replace with the currently connected wallet address ─────────────────
 // If you have a wallet context/hook, import it here and pass the address down.
 // For now we use a placeholder so the owner_wallet field is never empty.
 const PLACEHOLDER_WALLET = 'bchtest:qp0000000000000000000000000000000000000000'
+
+/** 
+ * Platform Oracle Public Key (Tally Engine) 
+ * In production, this would be a fixed key held by the platform backend.
+ */
+const PLATFORM_ORACLE_PK_HEX = '02' + '2'.repeat(64); // Simulation/Test key
 
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -136,12 +145,51 @@ export default function ProjectsPage() {
         console.log('[ProjectsPage] handleProjectCreate: received formData =', projectData)
         console.log('[ProjectsPage] handleProjectCreate: calling Supabase insert…')
 
-        // ── Real Supabase INSERT ──────────────────────────────────────────────
+        // ── 1. Initialize Wallet for Keys ────────────────────────────────────
+        let wallet = null;
+        try {
+            wallet = await initializeWallet();
+        } catch (e) {
+            console.warn('[ProjectsPage] Wallet init failed, using placeholders for keys');
+        }
+
+        // ── 2. Prepare Public Keys for Contract ──────────────────────────────
+        // Use real keys if wallet is connected, otherwise dummy but valid hex
+        const dummyPk = libauth.hexToBin('02' + '0'.repeat(64));
+        const creatorPk = wallet?.publicKey ? wallet.publicKey : dummyPk;
+        const funderPk = creatorPk; // Creator is default funder
+        const oraclePk = libauth.hexToBin(PLATFORM_ORACLE_PK_HEX);
+
+        // ── 3. Generate Uniq Milestone ID ─────────────────────────────────────
+        const sha256 = await libauth.instantiateSha256();
+        const milestoneId = sha256.hash(libauth.utf8ToBin(projectData.title + Date.now()));
+        const deadline = 2000000; // Far in the future block height
+
+        console.log('[ProjectsPage] Deploying MilestoneEscrow on-chain...');
+
+        // ── 4. Deploy Contract ────────────────────────────────────────────────
+        let contractAddress = 'bchtest:simulation_mode_address';
+        try {
+            const deployment = await deployMilestoneEscrow({
+                creatorPk,
+                funderPk,
+                oraclePk,
+                milestoneId,
+                deadlineHeight: deadline
+            });
+            contractAddress = deployment.address;
+            console.log('[ProjectsPage] ✓ Contract Deployed:', contractAddress);
+        } catch (deployErr) {
+            console.error('[ProjectsPage] ✗ Deployment failed:', deployErr);
+        }
+
+        // ── 5. Real Supabase INSERT ──────────────────────────────────────────────
         const { data: newProject, error: insertError } = await createProject({
             title: projectData.title,
             description: projectData.description ?? '',
             goal_amount: projectData.goal_amount,
-            owner_wallet: projectData.owner_wallet ?? PLACEHOLDER_WALLET,
+            owner_wallet: wallet?.cashaddr ?? projectData.owner_wallet ?? PLACEHOLDER_WALLET,
+            contract_address: contractAddress, // ← New column
             status: 'active',
         })
 
