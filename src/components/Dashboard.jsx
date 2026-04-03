@@ -1,9 +1,8 @@
 /**
- * Dashboard.jsx  —  Milestara Project Dashboard (Fully Database-Driven)
+ * Dashboard.jsx — Arbit Project Dashboard (AI-Powered)
  *
- * This version uses useEffect to fetch the latest project data from Supabase,
- * ensuring that the "Raised Amount" and "Milestones" are always accurate
- * and persist across page navigation.
+ * Fetches the latest project data from Supabase.
+ * Governance voting removed — AI oracle handles all scoring decisions.
  */
 
 import React, { useState, useEffect, useCallback } from 'react'
@@ -11,9 +10,7 @@ import { fetchProjectById } from '../lib/db/projects'
 import ProgressBar from './ProgressBar'
 import MilestoneCard from './MilestoneCard'
 import WalletPanel from './WalletPanel'
-import GovernancePanel from './GovernancePanel'
-import { scanVotes } from '../services/govService'
-import { castVote } from '../services/milestoneContract'
+import { Brain } from 'lucide-react'
 
 // ── Spinner Helper ─────────────────────────────────────────────────────────
 function LoadingSpinner() {
@@ -28,37 +25,20 @@ function LoadingSpinner() {
     )
 }
 
-export default function Dashboard({ project: initialProject, onFund, onVote, onTransaction, onReset }) {
+export default function Dashboard({ project: initialProject, onFund, onTransaction, onReset }) {
     // ── State ────────────────────────────────────────────────────────────────
     const [project, setProject] = useState(initialProject)
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState(null)
     const [connectedWallet, setConnectedWallet] = useState(null)
-    const [onChainTally, setOnChainTally] = useState({ yesVotes: 0, noVotes: 0, approvalPercentage: 0 })
 
     // ── Fetch Logic ──────────────────────────────────────────────────────────
-
-    /**
-     * fetchProjectData()
-     * 
-     * Refetches the project from Supabase. This is the source of truth.
-     * We call this on mount and after every transaction.
-     */
     const fetchProjectData = useCallback(async (isSilent = false) => {
         if (!isSilent) setLoading(true)
-        console.log(`[Dashboard] 🔄 Refreshing project (DB) & Governance (On-Chain)...`)
-
         try {
-            // 1. Fetch DB state (raised amount, milestones meta)
             const { data, error: fetchError } = await fetchProjectById(initialProject.id)
             if (fetchError) throw fetchError
             if (data) setProject(data)
-
-            // 2. Fetch On-Chain Tally — scoped to THIS project's voting addresses
-            const tally = await scanVotes(initialProject.id)
-            setOnChainTally(tally)
-            console.log(`[Dashboard] ✓ On-Chain Tally: ${tally.yesVotes} YES / ${tally.noVotes} NO`)
-
         } catch (err) {
             console.error('[Dashboard] Sync error:', err.message)
             setError(err.message)
@@ -67,88 +47,34 @@ export default function Dashboard({ project: initialProject, onFund, onVote, onT
         }
     }, [initialProject.id])
 
-    // Load data on mount
-    useEffect(() => {
-        fetchProjectData()
-    }, [fetchProjectData])
+    useEffect(() => { fetchProjectData() }, [fetchProjectData])
 
     // ── Handlers ──────────────────────────────────────────────────────────────
-
-    /**
-     * handleFundComplete()
-     * 
-     * Wrapper for the onFund prop.
-     * After the parent handles the transaction and DB update, we refetch.
-     */
     const handleFundComplete = async (amount, txHash) => {
-        console.log(`[Dashboard] Funding complete. Refreshing UI...`)
-        // 1. Notify parent (which records tx and updates DB)
         if (onFund) await onFund(amount, txHash, connectedWallet?.cashaddr)
-
-        // 2. Refresh local data from DB to reflect the new raised_amount
         await fetchProjectData(true)
     }
 
-    const handleGovApproval = useCallback((milestoneId) => {
-        if (onVote) onVote(milestoneId, 'yes')
-    }, [onVote])
-
-    /**
-     * handleMilestoneVote()
-     * 
-     * Consolidates DB and On-Chain voting.
-     * If wallet is connected, performs an on-chain GOV token transfer.
-     */
-    const handleMilestoneVote = async (milestoneId, type) => {
-        if (connectedWallet) {
-            console.log(`[Dashboard] Initiating On-Chain vote (${type}) for ${milestoneId}`)
-            try {
-                // Perform real blockchain transaction — passing projectId so the
-                // vote lands at this project's unique Approve/Reject address
-                await castVote(connectedWallet, initialProject.id, milestoneId, type, 1)
-
-                // Still notify parent (ProjectsPage) to record in DB if desired, 
-                // but wrap in try/catch to ignore the 409 conflict.
-                if (onVote) await onVote(milestoneId, type).catch(() => { })
-
-                // Refresh specifically the on-chain tally after a delay
-                setTimeout(() => fetchProjectData(true), 3000)
-            } catch (err) {
-                alert(`Blockchain vote failed: ${err.message}`)
-            }
-        } else {
-            // Web2 / DB fallback if not connected
-            if (onVote) await onVote(milestoneId, type)
-            await fetchProjectData(true)
-        }
-    }
-
     // ── Derived Values ────────────────────────────────────────────────────────
-
-    // Support both Supabase and fallback naming
-    const title = project?.title ?? 'Untitled Project'
-    const description = project?.description ?? ''
+    const title         = project?.title ?? 'Untitled Project'
+    const description   = project?.description ?? ''
     const fundingTarget = parseFloat(project?.goal_amount ?? project?.fundingTarget ?? 0)
-    const fundedAmount = parseFloat(project?.raised_amount ?? project?.fundedAmount ?? 0)
-    const milestones = Array.isArray(project?.milestones) ? project.milestones : []
-    // DB milestones use `approved` boolean; locally created ones use status string
+    const fundedAmount  = parseFloat(project?.raised_amount ?? project?.fundedAmount ?? 0)
+    const milestones    = Array.isArray(project?.milestones) ? project.milestones : []
     const approvedCount = milestones.filter(
         m => m.approved === true || m.status === 'Approved' || m.status === 'approved'
     ).length
 
-    // Strips the [On-Chain Address: ...] tag from the description for display.
     const cleanDescription = (text) => {
         if (!text) return ''
         return text.replace(/\[On-Chain Address: bchtest:[^\]]+\]/g, '').trim()
     }
 
-    // Fallback: If contract_address is null, try to extract it from the description
     const contract_address = project?.contract_address || (project?.description?.includes('[On-Chain Address: ')
         ? project.description.match(/\[On-Chain Address: (bchtest:[^\]]+)\]/)?.[1]
         : null)
 
     // ── Render Logic ──────────────────────────────────────────────────────────
-
     if (loading && !project) return <LoadingSpinner />
 
     return (
@@ -161,7 +87,7 @@ export default function Dashboard({ project: initialProject, onFund, onVote, onT
                         style={{ background: 'rgba(16,185,129,0.12)', border: '1px solid rgba(16,185,129,0.25)', color: '#10b981' }}
                     >
                         <div className="w-1.5 h-1.5 rounded-full bg-emerald-400" style={{ boxShadow: '0 0 5px rgba(52,211,153,0.9)' }} />
-                        Live Dashboard · Chipnet
+                        Live Dashboard · HashKey Chain
                     </div>
                     <h1 className="text-3xl font-bold text-white">{title}</h1>
                     {contract_address && (
@@ -191,7 +117,7 @@ export default function Dashboard({ project: initialProject, onFund, onVote, onT
                 <div className="card-glass rounded-2xl p-5">
                     <p className="text-slate-500 text-xs font-semibold uppercase tracking-wider mb-1">Target</p>
                     <p className="text-2xl font-bold text-white">{fundingTarget.toFixed(2)}</p>
-                    <p className="text-emerald-400 text-sm font-semibold mt-0.5">BCH</p>
+                    <p className="text-emerald-400 text-sm font-semibold mt-0.5">HSK</p>
                 </div>
                 <div className="card-glass rounded-2xl p-5 glow-green relative overflow-hidden">
                     {loading && (
@@ -201,12 +127,12 @@ export default function Dashboard({ project: initialProject, onFund, onVote, onT
                     )}
                     <p className="text-slate-500 text-xs font-semibold uppercase tracking-wider mb-1">Raised</p>
                     <p className="text-2xl font-bold" style={{ color: '#10b981' }}>{fundedAmount.toFixed(8)}</p>
-                    <p className="text-emerald-400 text-sm font-semibold mt-0.5">BCH</p>
+                    <p className="text-emerald-400 text-sm font-semibold mt-0.5">HSK</p>
                 </div>
                 <div className="card-glass rounded-2xl p-5">
-                    <p className="text-slate-500 text-xs font-semibold uppercase tracking-wider mb-1">Milestones</p>
+                    <p className="text-slate-500 text-xs font-semibold uppercase tracking-wider mb-1">AI Evaluations</p>
                     <p className="text-2xl font-bold text-white">{approvedCount}/{milestones.length}</p>
-                    <p className="text-cyan-400 text-sm font-semibold mt-0.5">Approved</p>
+                    <p className="text-cyan-400 text-sm font-semibold mt-0.5">AI Approved</p>
                 </div>
             </div>
 
@@ -229,24 +155,14 @@ export default function Dashboard({ project: initialProject, onFund, onVote, onT
                 onWalletConnect={setConnectedWallet}
             />
 
-            {/* ── Governance + Milestone Locking Panel ──────────────── */}
-            <GovernancePanel
-                wallet={connectedWallet}
-                projectId={initialProject.id}
-                milestones={milestones}
-                onMilestoneApproved={handleGovApproval}
-                onTransaction={async (amt, hash, type) => {
-                    if (onTransaction) await onTransaction(amt, hash, type, connectedWallet?.cashaddr)
-                    await fetchProjectData(true)
-                }}
-            />
-
             {/* ── Milestones Section ────────────────────────────────────────── */}
-            <div className="card-glass rounded-2xl p-8">
+            <div className="card-glass rounded-2xl p-8 mt-6">
                 <div className="flex items-center justify-between mb-6">
                     <div>
                         <h2 className="text-lg font-bold text-white">Milestones</h2>
-                        <p className="text-slate-500 text-sm mt-0.5">Vote to approve or reject each milestone</p>
+                        <p className="text-slate-500 text-sm mt-0.5">
+                            AI oracle evaluates each submission automatically
+                        </p>
                     </div>
                     <div
                         className="flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold"
@@ -261,16 +177,8 @@ export default function Dashboard({ project: initialProject, onFund, onVote, onT
                         milestones.map((milestone, index) => (
                             <MilestoneCard
                                 key={milestone.id}
-                                milestone={{
-                                    ...milestone,
-                                    // Override UI votes with blockchain-weighted tally if available
-                                    onChainVotes: {
-                                        yes: onChainTally.yesVotes,
-                                        no: onChainTally.noVotes
-                                    }
-                                }}
+                                milestone={milestone}
                                 index={index}
-                                onVote={handleMilestoneVote}
                             />
                         ))
                     ) : (
@@ -283,8 +191,8 @@ export default function Dashboard({ project: initialProject, onFund, onVote, onT
                         className="mt-6 p-4 rounded-xl text-center"
                         style={{ background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.3)' }}
                     >
-                        <p className="text-emerald-400 font-bold text-lg">🎉 All milestones approved!</p>
-                        <p className="text-slate-400 text-sm mt-1">The project is governance-complete.</p>
+                        <p className="text-emerald-400 font-bold text-lg">🎉 All milestones AI-approved!</p>
+                        <p className="text-slate-400 text-sm mt-1">Funds have been automatically released by the AI oracle.</p>
                     </div>
                 )}
             </div>

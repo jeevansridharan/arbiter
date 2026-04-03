@@ -297,7 +297,7 @@ export default function ProjectsPage() {
 
     const handleVote = async (milestoneId, voteType) => {
         // Resolve stable anonymous voter ID from localStorage
-        const key = 'milestara_anon_voter_id'
+        const key = 'arbit_anon_voter_id'
         let voterId = localStorage.getItem(key)
         if (!voterId) {
             voterId = 'anon_' + Math.random().toString(36).slice(2) + Date.now().toString(36)
@@ -365,7 +365,6 @@ export default function ProjectsPage() {
             <Dashboard
                 project={activeProject}
                 onFund={handleFund}
-                onVote={handleVote}
                 onTransaction={handleTransaction}
                 onReset={handleReset}
             />
@@ -409,7 +408,7 @@ export default function ProjectsPage() {
                         Projects
                     </h1>
                     <p style={{ color: '#64748b', fontSize: '0.875rem' }}>
-                        {loading ? 'Loading…' : `${projects.length} project${projects.length !== 1 ? 's' : ''} on Chipnet`}
+                        {loading ? 'Loading…' : `${projects.length} project${projects.length !== 1 ? 's' : ''} on HashKey Chain`}
                     </p>
                 </div>
 
@@ -513,7 +512,7 @@ export default function ProjectsPage() {
                         No projects yet
                     </p>
                     <p style={{ color: '#475569', fontSize: '0.875rem', marginBottom: '24px' }}>
-                        Be the first to create a milestone-based funding project on Chipnet.
+                        Be the first to create a milestone-based funding submission on HashKey Chain.
                     </p>
                     <button
                         onClick={() => setShowForm(true)}

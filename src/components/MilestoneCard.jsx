@@ -1,22 +1,78 @@
 import React from 'react'
+import { Brain, CheckCircle, XCircle, Clock } from 'lucide-react'
 
-export default function MilestoneCard({ milestone, index, onVote }) {
-    const { title, status, approved } = milestone
+// ── AI Status badge helper ────────────────────────────────────────────────────
+function AIStatusBadge({ score, isScored }) {
+    if (!isScored) {
+        return (
+            <span style={{
+                display: 'inline-flex', alignItems: 'center', gap: '5px',
+                fontSize: '0.68rem', fontWeight: 700, padding: '3px 10px',
+                borderRadius: '999px', whiteSpace: 'nowrap',
+                background: 'rgba(234,179,8,0.12)',
+                border: '1px solid rgba(234,179,8,0.3)',
+                color: '#fbbf24',
+            }}>
+                <Clock size={11} /> Pending AI Evaluation
+            </span>
+        )
+    }
+    if (score >= 60) {
+        return (
+            <span style={{
+                display: 'inline-flex', alignItems: 'center', gap: '5px',
+                fontSize: '0.68rem', fontWeight: 700, padding: '3px 10px',
+                borderRadius: '999px', whiteSpace: 'nowrap',
+                background: 'rgba(16,185,129,0.12)',
+                border: '1px solid rgba(16,185,129,0.3)',
+                color: '#34d399',
+            }}>
+                <CheckCircle size={11} /> AI Approved
+            </span>
+        )
+    }
+    return (
+        <span style={{
+            display: 'inline-flex', alignItems: 'center', gap: '5px',
+            fontSize: '0.68rem', fontWeight: 700, padding: '3px 10px',
+            borderRadius: '999px', whiteSpace: 'nowrap',
+            background: 'rgba(239,68,68,0.1)',
+            border: '1px solid rgba(239,68,68,0.3)',
+            color: '#f87171',
+        }}>
+            <XCircle size={11} /> AI Rejected
+        </span>
+    )
+}
 
-    // Source of Truth: On-Chain vs Database
-    // If onChainVotes exists (from a scan), we prioritize it as it represents real governance power.
-    const isOnChain = !!milestone.onChainVotes
-    const votes = milestone.onChainVotes ?? milestone.votes ?? { yes: milestone.voteYes ?? 0, no: milestone.voteNo ?? 0 }
+// ── Score bar ─────────────────────────────────────────────────────────────────
+function ScoreBar({ score }) {
+    const color = score >= 75 ? '#10b981' : score >= 50 ? '#f59e0b' : '#f43f5e'
+    return (
+        <div style={{ marginBottom: '16px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
+                <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 600 }}>AI SCORE</span>
+                <span style={{ fontSize: '0.85rem', fontWeight: 800, color }}>{score} / 100</span>
+            </div>
+            <div style={{ height: '6px', background: 'rgba(255,255,255,0.06)', borderRadius: '999px', overflow: 'hidden' }}>
+                <div style={{
+                    height: '100%', borderRadius: '999px', width: `${score}%`,
+                    background: `linear-gradient(90deg, ${color}, ${color}cc)`,
+                    transition: 'width 0.6s cubic-bezier(0.4,0,0.2,1)',
+                }} />
+            </div>
+        </div>
+    )
+}
 
-    // Approved if: DB flag set, status string says so, or vote tally says so
-    const totalVotes = (votes.yes ?? 0) + (votes.no ?? 0)
-    const isApproved =
-        approved === true ||
-        status === 'Approved' || status === 'approved' ||
-        (totalVotes > 0 && (votes.yes ?? 0) / totalVotes > 0.5)
+// ─────────────────────────────────────────────────────────────────────────────
+export default function MilestoneCard({ milestone, index }) {
+    const { title, approved, score } = milestone
 
-    const yesPercent = totalVotes > 0 ? Math.round(((votes.yes ?? 0) / totalVotes) * 100) : 0
-    const noPercent = totalVotes > 0 ? Math.round(((votes.no ?? 0) / totalVotes) * 100) : 0
+    // Resolve score and approval state
+    const aiScore   = typeof score === 'number' ? score : (approved === true ? 80 : 0)
+    const isScored  = typeof score === 'number' || approved === true
+    const isApproved = approved === true || (isScored && aiScore >= 60)
 
     return (
         <div className={`milestone-card p-5 ${isApproved ? 'milestone-approved' : ''}`}>
@@ -39,69 +95,50 @@ export default function MilestoneCard({ milestone, index, onVote }) {
                     <div>
                         <h3 className="text-white font-semibold text-sm">{title}</h3>
                         <p className="text-slate-500 text-xs mt-0.5">
-                            {totalVotes === 0
-                                ? 'No votes cast yet'
-                                : `${totalVotes.toLocaleString()} ${isOnChain ? 'Tokens' : 'Votes'} cast`}
+                            {isScored
+                                ? `AI evaluated — score ${aiScore}/100`
+                                : 'Awaiting AI evaluation'}
                         </p>
                     </div>
                 </div>
-                {/* Status badge */}
-                <span className={isApproved ? 'badge-approved' : 'badge-pending'}>
-                    {isApproved ? '✓ Approved' : '⏳ Pending'}
+                {/* AI Status badge */}
+                <AIStatusBadge score={aiScore} isScored={isScored} />
+            </div>
+
+            {/* Score bar (only if scored) */}
+            {isScored && <ScoreBar score={aiScore} />}
+
+            {/* AI evaluation note */}
+            <div style={{
+                display: 'flex', alignItems: 'center', gap: '8px',
+                padding: '10px 14px', borderRadius: '10px',
+                background: isApproved
+                    ? 'rgba(16,185,129,0.07)'
+                    : isScored
+                        ? 'rgba(239,68,68,0.06)'
+                        : 'rgba(234,179,8,0.06)',
+                border: isApproved
+                    ? '1px solid rgba(16,185,129,0.2)'
+                    : isScored
+                        ? '1px solid rgba(239,68,68,0.2)'
+                        : '1px solid rgba(234,179,8,0.2)',
+            }}>
+                <Brain size={14} color={isApproved ? '#10b981' : isScored ? '#f87171' : '#fbbf24'} />
+                <span style={{
+                    fontSize: '0.75rem', fontWeight: 600,
+                    color: isApproved ? '#34d399' : isScored ? '#f87171' : '#fbbf24',
+                }}>
+                    {isApproved
+                        ? 'AI Approved — funds will be released automatically'
+                        : isScored
+                            ? 'AI Rejected — score below threshold'
+                            : 'Pending AI Evaluation — submit proof to trigger scoring'}
                 </span>
             </div>
 
-            {/* Vote bar */}
-            {totalVotes > 0 && (
-                <div className="mb-4">
-                    <div className="flex rounded-full overflow-hidden h-2 mb-1.5" style={{ background: 'rgba(255,255,255,0.05)' }}>
-                        <div
-                            className="h-full transition-all duration-500"
-                            style={{ width: `${yesPercent}%`, background: 'linear-gradient(90deg, #10b981, #059669)' }}
-                        />
-                        <div
-                            className="h-full transition-all duration-500"
-                            style={{ width: `${noPercent}%`, background: 'linear-gradient(90deg, #be123c, #e11d48)' }}
-                        />
-                    </div>
-                    <div className="flex justify-between text-xs text-slate-500">
-                        <span className="text-emerald-400 font-medium">Yes {yesPercent}%</span>
-                        <span className="text-rose-400 font-medium">No {noPercent}%</span>
-                    </div>
-                </div>
-            )}
-
-            {/* Vote buttons row */}
-            <div className="flex items-center gap-3">
-                <button
-                    id={`vote-yes-${index}`}
-                    onClick={() => onVote(milestone.id, 'yes')}
-                    className="flex-1 py-2.5 rounded-xl font-semibold text-sm text-white flex items-center justify-center gap-2"
-                    style={{ background: 'linear-gradient(135deg, #10b981, #059669)', border: 'none', cursor: 'pointer' }}
-                >
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M7 10l5-5 5 5M7 15l5-5 5 5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
-                    Yes
-                    <span className="ml-1 px-2 py-0.5 rounded-full text-xs font-bold" style={{ background: 'rgba(0,0,0,0.25)' }}>
-                        {votes.yes}
-                    </span>
-                </button>
-
-                <button
-                    id={`vote-no-${index}`}
-                    onClick={() => onVote(milestone.id, 'no')}
-                    className="flex-1 py-2.5 rounded-xl font-semibold text-sm text-white flex items-center justify-center gap-2"
-                    style={{ background: 'linear-gradient(135deg, #f43f5e, #e11d48)', border: 'none', cursor: 'pointer' }}
-                >
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M7 9l5 5 5-5M7 14l5 5 5-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
-                    No
-                    <span className="ml-1 px-2 py-0.5 rounded-full text-xs font-bold" style={{ background: 'rgba(0,0,0,0.25)' }}>
-                        {votes.no.toLocaleString()}
-                    </span>
-                </button>
-            </div>
-            {isOnChain && (
+            {isApproved && (
                 <p className="text-[10px] text-emerald-500/60 mt-3 text-center font-semibold tracking-tight">
-                    🔒 SECURED BY ON-CHAIN CASHTOKENS
+                    🤖 SECURED BY AI ORACLE · HASHKEY CHAIN
                 </p>
             )}
         </div>

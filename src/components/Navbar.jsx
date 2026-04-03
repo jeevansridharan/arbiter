@@ -16,17 +16,17 @@ export default function Navbar() {
                     </div>
                     <div>
                         <span className="text-xl font-bold tracking-tight" style={{ background: 'linear-gradient(135deg, #10b981, #06b6d4)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
-                            Milestara
+                            Arbit
                         </span>
-                        <div className="text-xs text-slate-500 font-medium -mt-0.5">BCH Milestone Funding</div>
+                        <div className="text-xs text-slate-500 font-medium -mt-0.5">AI-powered Autonomous Funding</div>
                     </div>
                 </div>
 
                 {/* Network Badge */}
                 <div className="flex items-center gap-2 px-4 py-2 rounded-full" style={{ background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.25)' }}>
                     <div className="w-2 h-2 rounded-full bg-emerald-400" style={{ boxShadow: '0 0 6px rgba(16,185,129,0.8)', animation: 'pulse 2s infinite' }}></div>
-                    <span className="text-emerald-400 text-sm font-semibold">Bitcoin Cash</span>
-                    <span className="text-slate-500 text-xs">Chipnet</span>
+                    <span className="text-emerald-400 text-sm font-semibold">HashKey Chain</span>
+                    <span className="text-slate-500 text-xs">Live</span>
                 </div>
             </div>
         </nav>

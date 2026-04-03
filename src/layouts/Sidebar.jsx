@@ -1,5 +1,5 @@
 /**
- * Sidebar.jsx — Milestara left navigation sidebar
+ * Sidebar.jsx — Arbit left navigation sidebar
  * Collapsible · Active route highlighting · Smooth transitions
  */
 
@@ -8,7 +8,6 @@ import { NavLink, useLocation } from 'react-router-dom'
 import {
     LayoutDashboard,
     FolderKanban,
-    Vote,
     ArrowLeftRight,
     UserCircle,
     ChevronLeft,
@@ -20,7 +19,6 @@ import {
 const NAV_ITEMS = [
     { to: '/', label: 'Dashboard', Icon: LayoutDashboard },
     { to: '/projects', label: 'Projects', Icon: FolderKanban },
-    { to: '/governance', label: 'Governance', Icon: Vote },
     { to: '/transactions', label: 'Transactions', Icon: ArrowLeftRight },
     { to: '/profile', label: 'Profile', Icon: UserCircle },
 ]
@@ -83,7 +81,7 @@ export default function Sidebar() {
                 {!collapsed && (
                     <div style={{ overflow: 'hidden', whiteSpace: 'nowrap' }}>
                         <span style={{ color: '#fff', fontWeight: 800, fontSize: '1.1rem', letterSpacing: '-0.02em' }}>
-                            Milestara
+                            Arbit
                         </span>
                         <div style={{
                             fontSize: '0.65rem',
@@ -92,7 +90,7 @@ export default function Sidebar() {
                             letterSpacing: '0.08em',
                             marginTop: '1px',
                         }}>
-                            BCH · CHIPNET
+                            HASHKEY CHAIN
                         </div>
                     </div>
                 )}
@@ -190,8 +188,8 @@ export default function Sidebar() {
                         flexShrink: 0,
                     }} />
                     <div>
-                        <div style={{ fontSize: '0.7rem', fontWeight: 700, color: '#10b981' }}>Chipnet Live</div>
-                        <div style={{ fontSize: '0.65rem', color: '#475569' }}>BCH Testnet</div>
+                        <div style={{ fontSize: '0.7rem', fontWeight: 700, color: '#10b981' }}>HashKey Live</div>
+                        <div style={{ fontSize: '0.65rem', color: '#475569' }}>HashKey Chain</div>
                     </div>
                 </div>
             )}
