@@ -12,7 +12,7 @@
  * Signatures from a Tally Oracle unlock the milestones.
  */
 
-import { TestNetWallet } from 'mainnet-js'
+// mainnet-js loaded lazily via bchWallet.js — no direct static import needed
 import { mintGovTokens, GOV_TOKEN_CATEGORY_ID } from './govService'
 
 // ── Constants ────────────────────────────────────────────────────────────────

@@ -10,7 +10,7 @@
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
-import { TestNetWallet, toBch, Connection } from 'mainnet-js'
+// mainnet-js is loaded lazily to avoid Vite bundler resolution errors
 
 // --- Governance Category ID (Shared) ---
 export const GOV_TOKEN_CATEGORY_ID = '9da68991a0c7c647565c567540a02d41549dad1182284730b9a92e21d7a4c651'
@@ -36,6 +36,7 @@ const WALLET_STORAGE_KEY = 'milestara_chipnet_wif'
 async function setupChipnetProvider(wallet) {
     console.log('[bchWallet] Configuring Chipnet network provider...')
     try {
+        const { Connection } = await import('mainnet-js')
         // Create a dedicated Chipnet connection
         const conn = new Connection('testnet', CHIPNET_ELECTRUM_WSS)
 
@@ -66,6 +67,8 @@ export async function initializeWallet(wif = null) {
     let wallet
 
     try {
+        const { TestNetWallet } = await import('mainnet-js')
+
         // 1. If no WIF provided, check localStorage
         if (!wif) {
             wif = localStorage.getItem(WALLET_STORAGE_KEY)
@@ -119,6 +122,7 @@ export async function getBalance(wallet) {
         console.log('[bchWallet] Raw satoshis (BigInt):', satoshisBigInt.toString())
 
         // 3. Convert Satoshis (BigInt) -> BCH (Number) using toBch utility
+        const { toBch } = await import('mainnet-js')
         const bchBalance = Number(toBch(satoshisBigInt))
         console.log('[bchWallet] Final BCH Balance:', bchBalance)
 

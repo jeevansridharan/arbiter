@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { Vote, Info, Coins, Shield, ChevronRight } from 'lucide-react'
 import { supabase } from '../lib/supabaseClient'
-import { TestNetWallet } from 'mainnet-js'
+// mainnet-js not needed directly in this page — wallet ops are in bchWallet.js
 
 // ── Info card ─────────────────────────────────────────────────────────────────
 function InfoCard({ Icon, title, body, color }) {

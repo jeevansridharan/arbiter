@@ -23,7 +23,8 @@ export default defineConfig({
     'global': 'globalThis',
   },
   optimizeDeps: {
-    // Let Vite pre-bundle mainnet-js properly
-    include: ['mainnet-js'],
+    // mainnet-js uses internal relative paths that esbuild can't resolve
+    // during pre-bundling — exclude it so Vite handles it natively
+    exclude: ['mainnet-js'],
   },
 })
