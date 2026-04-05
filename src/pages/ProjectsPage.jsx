@@ -1,64 +1,19 @@
-/**
- * src/pages/ProjectsPage.jsx
- *
- * ── WHAT THIS FILE DOES ──────────────────────────────────────────────────────
- * 1. On page load (useEffect), fetches all rows from the Supabase `projects`
- *    table, ordered by newest first.
- * 2. Stores fetched data in React state (useState).
- * 3. Handles three UI states: loading → error → data (or empty).
- * 4. Renders a responsive grid of ProjectCard components.
- * 5. Provides a "Create Project" panel that switches to the form.
- *
- * ── FILE LOCATION ────────────────────────────────────────────────────────────
- * src/pages/ProjectsPage.jsx
- * Rendered by App.jsx at the /projects route.
- *
- * ── REQUIRED IMPORTS ─────────────────────────────────────────────────────────
- * supabase        → from '../lib/supabase'    (Supabase client singleton)
- * ProjectCard     → from '../components/ProjectCard'
- * ProjectForm     → from '../components/ProjectForm'
- * Dashboard       → from '../components/Dashboard'
- * React hooks     → useState, useEffect, useCallback from 'react'
- *
- * ── RLS NOTE ─────────────────────────────────────────────────────────────────
- * The `projects` table has a PUBLIC READ policy:
- *   CREATE POLICY "projects: public read" ON projects FOR SELECT USING (true);
- * This means anyone — even without a wallet — can read project data.
- * If you see an empty list when data exists, check:
- *   1. Supabase dashboard → Table Editor → projects → is data there?
- *   2. Supabase dashboard → Auth → Policies → "projects" → is public read on?
- *   3. Your .env VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY are correct.
- */
-
 import React, { useState, useEffect, useCallback } from 'react'
 import {
     FolderKanban, Plus, RefreshCw,
     AlertCircle, Inbox,
 } from 'lucide-react'
 
-import { supabase, supabaseConfigured } from '../lib/supabase'
-import { createProject, deleteProject, updateRaisedAmount } from '../lib/db/projects'
+import { createProject, deleteProject, updateRaisedAmount, fetchProjects as dbFetchProjects } from '../lib/db/projects'
 import { insertTransaction } from '../lib/db/transactions'
 import { createMilestoneBatch } from '../lib/db/milestones'
 import { voteOnMilestone, hasUserVoted } from '../lib/db/votes'
 import ProjectCard from '../components/ProjectCard'
 import ProjectForm from '../components/ProjectForm'
 import Dashboard from '../components/Dashboard'
-import { deployMilestoneEscrow } from '../../production/scripts/deployContract'
-import { generateVotingAddresses } from '../../production/scripts/generateVotingAddresses'
-import { initializeWallet } from '../services/bchWallet'
-import * as libauth from '@bitauth/libauth'
+import { initializeWallet } from '../services/evmWallet'
 
-// ── TODO: Replace with the currently connected wallet address ─────────────────
-// If you have a wallet context/hook, import it here and pass the address down.
-// For now we use a placeholder so the owner_wallet field is never empty.
-const PLACEHOLDER_WALLET = 'bchtest:qp0000000000000000000000000000000000000000'
-
-/** 
- * Platform Oracle Public Key (Tally Engine) 
- * In production, this would be a fixed key held by the platform backend.
- */
-const PLATFORM_ORACLE_PK_HEX = '02' + '2'.repeat(64); // Simulation/Test key
+const PLACEHOLDER_WALLET = '0x0000000000000000000000000000000000000000'
 
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -66,10 +21,10 @@ export default function ProjectsPage() {
 
     // ── State ─────────────────────────────────────────────────────────────────
 
-    /** All projects fetched from Supabase */
+    /** All projects fetched from database */
     const [projects, setProjects] = useState([])
 
-    /** true while the Supabase request is in-flight */
+    /** true while the database request is in-flight */
     const [loading, setLoading] = useState(true)
 
     /** Non-null string if the fetch failed */
@@ -81,12 +36,12 @@ export default function ProjectsPage() {
     /** Active project (once created/selected by user) */
     const [activeProject, setActiveProject] = useState(null)
 
-    // ── Fetch projects from Supabase ──────────────────────────────────────────
+    // ── Fetch projects from database ──────────────────────────────────────────
 
     /**
      * fetchProjects()
      *
-     * Sends a SELECT query to Supabase:
+     * Sends a SELECT query to database:
      *   SELECT * FROM projects ORDER BY created_at DESC
      *
      * Uses useCallback so it can be passed to the refresh button
@@ -96,25 +51,19 @@ export default function ProjectsPage() {
         setLoading(true)   // show spinner
         setError(null)     // clear any previous error
 
-        if (!supabaseConfigured || !supabase) {
-            setError('Supabase not configured — add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY to your .env file.')
-            setLoading(false)
-            return
-        }
+        try {
+            const { data, error: dbError } = await dbFetchProjects()
 
-        const { data, error: sbError } = await supabase
-            .from('projects')          // target table
-            .select('*')               // all columns
-            .order('created_at', { ascending: false })  // newest first
-            .limit(50)                 // safety limit
-
-        if (sbError) {
-            // Supabase returned an error (RLS block, network issue, etc.)
-            console.error('[ProjectsPage] Supabase error:', sbError)
-            setError(sbError.message)
-            setProjects([])
-        } else {
-            setProjects(data ?? [])    // `data` is null if table is empty
+            if (dbError) {
+                console.error('[ProjectsPage] DB error:', dbError)
+                setError(dbError.message)
+                setProjects([])
+            } else {
+                setProjects(data ?? [])
+            }
+        } catch (err) {
+            console.error('[ProjectsPage] Unexpected error:', err)
+            setError(err.message)
         }
 
         setLoading(false)  // hide spinner
@@ -144,80 +93,33 @@ export default function ProjectsPage() {
      */
     const handleProjectCreate = async (projectData) => {
         console.log('[ProjectsPage] handleProjectCreate: received formData =', projectData)
-        console.log('[ProjectsPage] handleProjectCreate: calling Supabase insert…')
+        console.log('[ProjectsPage] handleProjectCreate: calling mock database insert…')
 
-        // ── 1. Initialize Wallet for Keys ────────────────────────────────────
         let wallet = null;
         try {
             wallet = await initializeWallet();
         } catch (e) {
-            console.warn('[ProjectsPage] Wallet init failed, using placeholders for keys');
+            console.warn('[ProjectsPage] Wallet init failed');
         }
 
-        // ── 2. Prepare Public Keys for Contract ──────────────────────────────
-        // Use real keys if wallet is connected, otherwise dummy but valid hex
-        const dummyPk = libauth.hexToBin('02' + '0'.repeat(64));
-        const creatorPk = wallet?.publicKey ? wallet.publicKey : dummyPk;
-        const funderPk = creatorPk; // Creator is default funder
-        const oraclePk = libauth.hexToBin(PLATFORM_ORACLE_PK_HEX);
-
-        // ── 3. Generate Uniq Milestone ID ─────────────────────────────────────
-        const sha256 = await libauth.instantiateSha256();
-        const milestoneId = sha256.hash(libauth.utf8ToBin(projectData.title + Date.now()));
-        const deadline = 2000000; // Far in the future block height
-
-        console.log('[ProjectsPage] Deploying MilestoneEscrow on-chain...');
-
-        // ── 4. Deploy Contract ────────────────────────────────────────────────
-        let contractAddress = '';
-        try {
-            const deployment = await deployMilestoneEscrow({
-                creatorPk,
-                funderPk,
-                oraclePk,
-                milestoneId,
-                deadlineHeight: deadline
-            });
-            contractAddress = deployment.address;
-            console.log('[ProjectsPage] ✓ Contract Deployed:', contractAddress);
-        } catch (deployErr) {
-            console.error('[ProjectsPage] ✗ Deployment failed:', deployErr);
-        }
-
-        // ── 5. Pre-generate Voting Addresses ──────────────────────────────────
-        // We don't have the projectId yet (it's assigned by Supabase), so we
-        // embed voting addresses in the description. After insert, we can use
-        // the real UUID returned from Supabase for future-address derivation.
-        // NOTE: The canonical per-project addresses are always derivable from
-        // the project UUID via generateVotingAddresses(projectId), so storing
-        // them here is just a convenience cache for the initial render.
-        console.log('[ProjectsPage] Voting addresses will be derived from project UUID after insert.');
-
-        // ── 6. Build description with on-chain metadata (fallback storage) ────
-        // This safely embeds the contract address even if the DB column is missing.
-        const metaTags = contractAddress
-            ? `\n\n[On-Chain Address: ${contractAddress}]`
-            : '';
-        const fullDescription = (projectData.description ?? '') + metaTags;
-
-        // ── 7. Real Supabase INSERT ───────────────────────────────────────────
+        // ── 1. Real database INSERT ───────────────────────────────────────────
         const { data: newProject, error: insertError } = await createProject({
             title: projectData.title,
-            description: fullDescription,
+            description: projectData.description ?? '',
             goal_amount: projectData.goal_amount,
-            owner_wallet: wallet?.cashaddr ?? projectData.owner_wallet ?? PLACEHOLDER_WALLET,
-            contract_address: contractAddress,
+            owner_wallet: wallet?.address ?? projectData.owner_wallet ?? PLACEHOLDER_WALLET,
+            contract_address: '0xHashKeyEscrowMockAddress',
             status: 'active',
         })
 
         if (insertError) {
             console.error('[ProjectsPage] handleProjectCreate: INSERT FAILED:', insertError)
-            throw new Error(insertError.message ?? 'Supabase insert failed')
+            throw new Error(insertError.message ?? 'Database insert failed')
         }
 
         console.log('[ProjectsPage] handleProjectCreate: ✓ project inserted:', newProject)
 
-        // ── BUG FIX: Save milestones to Supabase ──────────────────────────────
+        // ── BUG FIX: Save milestones to database ──────────────────────────────
         // Previously milestones were only kept in local state with fake IDs,
         // causing "No milestones defined" on the dashboard.
         let savedMilestones = []
