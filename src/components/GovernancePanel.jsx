@@ -1,26 +1,11 @@
 /**
- * GovernancePanel.jsx  —  Milestara Bitcoin Cash Chipnet UI
- *
- * This panel shows:
- *   1. Current GOV token balance
- *   2. Locked BCH amount in the "contract"
- *   3. Token-weighted voting per milestone
- *   4. Release button after milestone is approved
- *
- * It connects to milestoneContract.js service functions.
+ * GovernancePanel.jsx — Arbit EVM Governance UI (HashKey Chain)
+ * Migrated from BCH/CashTokens to EVM (HSK) and Mock AI Governance.
  */
 
 import React, { useState, useEffect, useCallback } from 'react'
-import {
-    fundMilestoneContract,
-    castVote,
-    releaseMilestoneFunds,
-    getLockedAmount,
-    chipnetExplorerUrl,
-    clearContractState,
-} from '../services/milestoneContract'
-import { PROJECT_ADDRESS, getTokenBalance } from '../services/bchWallet'
-import { scanVotes } from '../services/govService'
+import { getBalance } from '../services/evmWallet'
+import { mockDB } from '../lib/db/mockDB'
 
 // ── Spinner ──────────────────────────────────────────────────────────────────
 function Spinner() {
@@ -33,10 +18,10 @@ function Spinner() {
 }
 
 // ── Vote Bar ──────────────────────────────────────────────────────────────────
-function VoteBar({ votes }) {
-    const total = votes.yes + votes.no
-    const yesP = total > 0 ? Math.round((votes.yes / total) * 100) : 0
-    const noP = total > 0 ? Math.round((votes.no / total) * 100) : 0
+function VoteBar({ yes, no }) {
+    const total = yes + no
+    const yesP = total > 0 ? Math.round((yes / total) * 100) : 0
+    const noP = total > 0 ? Math.round((no / total) * 100) : 0
     return (
         <div className="mb-3">
             <div className="flex rounded-full overflow-hidden h-2 mb-1.5" style={{ background: 'rgba(255,255,255,0.05)' }}>
@@ -44,100 +29,81 @@ function VoteBar({ votes }) {
                 <div className="h-full transition-all duration-700" style={{ width: `${noP}%`, background: 'linear-gradient(90deg, #be123c, #e11d48)' }} />
             </div>
             <div className="flex justify-between text-xs">
-                <span style={{ color: '#34d399' }}>✓ YES  {yesP}% ({votes.yes} tokens)</span>
-                <span style={{ color: '#f87171' }}>✗ NO  {noP}% ({votes.no} tokens)</span>
+                <span className="text-emerald-400 font-bold">✓ YES {yesP}% ({yes} votes)</span>
+                <span className="text-rose-400 font-bold">✗ NO {noP}% ({no} votes)</span>
             </div>
         </div>
     )
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// MAIN COMPONENT
-// ─────────────────────────────────────────────────────────────────────────────
 export default function GovernancePanel({ wallet, projectId, milestones = [], onMilestoneApproved, onTransaction }) {
-    // ── State ─────────────────────────────────────────────────────────────────
     const [tokenBal, setTokenBal] = useState(0)
-    const [lockedBch, setLockedBch] = useState(0)
-    const [mintAmt, setMintAmt] = useState('0.001')
-    const [mintLoading, setMintLoading] = useState(false)
-    const [mintResult, setMintResult] = useState(null)
-    const [voteTokens, setVoteTokens] = useState(1)
-    const [voteLoading, setVoteLoading] = useState(null)  // milestoneId
-    const [releaseId, setReleaseId] = useState(null)  // milestoneId being released
-    const [releaseTxId, setReleaseTxId] = useState({})
+    const [lockedHsk, setLockedHsk] = useState(0)
+    const [voteLoading, setVoteLoading] = useState(null)
     const [error, setError] = useState('')
     const [milestoneVotes, setMilestoneVotes] = useState({})
 
-    // ── Load state ────────────────────────────────────────────────────────────
     const refreshState = useCallback(async () => {
-        // 1. Fetch real-time token balance from wallet
-        const tks = await getTokenBalance(wallet)
-        setTokenBal(tks)
+        if (!wallet) return
+        
+        // 1. Balance from EVM Wallet
+        const addr = wallet.address || (await wallet.getAddress())
+        const bal = await getBalance(addr)
+        setTokenBal(Math.floor(bal * 100)) // Simulation: 1 HSK = 100 Voting Power
 
-        // 2. Fetch locked BCH in contract
-        setLockedBch(getLockedAmount())
+        // 2. Fetch locked amount (Simulated from localStorage via mockDB logic)
+        const transactions = mockDB.getAll('transactions')
+        const locked = transactions
+            .filter(tx => tx.project_id === projectId && tx.type === 'funding')
+            .reduce((sum, tx) => sum + parseFloat(tx.amount || 0), 0)
+        setLockedHsk(locked)
 
-        // 3. Scan On-Chain Votes — scoped to this project's addresses
-        const tally = await scanVotes(projectId)
-        console.log('[GovernancePanel] On-Chain Tally fetched:', tally)
-
+        // 3. Fetch votes from mockDB
         const votes = {}
         milestones.forEach(m => {
+            const mVotes = mockDB.getAll('votes').filter(v => v.milestone_id === m.id)
             votes[m.id] = {
-                yes: tally.yesVotes,
-                no: tally.noVotes
+                yes: mVotes.filter(v => v.vote === 'yes').length,
+                no: mVotes.filter(v => v.vote === 'no').length
             }
         })
         setMilestoneVotes(votes)
-    }, [milestones, wallet?.cashaddr, projectId])
+    }, [wallet, projectId, milestones])
 
-    useEffect(() => { refreshState() }, [refreshState, milestones])
+    useEffect(() => {
+        refreshState()
+    }, [refreshState])
 
     if (!wallet) {
         return (
             <div className="card-glass rounded-2xl p-6 mb-6">
-                <WeekBadge />
-                <p className="text-slate-400 text-sm mt-4 text-center">
-                    🔒 Connect your Chipnet wallet above to unlock governance features.
-                </p>
+                <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-emerald-500/10 border border-emerald-500/30">
+                        <span className="text-xl">🗳️</span>
+                    </div>
+                    <div>
+                        <h2 className="text-white font-bold text-base">EVM Governance</h2>
+                        <p className="text-slate-500 text-xs">Unlock with HashKey Wallet</p>
+                    </div>
+                </div>
             </div>
         )
     }
 
-    const handleMint = async () => {
-        setError('')
-        setMintLoading(true)
-        setMintResult(null)
-        try {
-            const parsed = parseFloat(mintAmt)
-            if (!parsed || parsed <= 0) throw new Error('Enter a valid BCH amount')
-            const result = await fundMilestoneContract(wallet, parsed, PROJECT_ADDRESS)
-            setMintResult(result)
-            if (onTransaction) {
-                onTransaction(parsed, result.simulatedTxId, 'funding')
-            }
-            await refreshState()
-        } catch (e) {
-            setError(e.message || 'Minting failed')
-        } finally {
-            setMintLoading(false)
-        }
-    }
-
     const handleVote = async (milestoneId, voteType) => {
-        setError('')
         setVoteLoading(milestoneId + voteType)
         try {
-            // ON-CHAIN VOTING: Send tokens to this project's Approve/Reject P2PKH address
-            const res = await castVote(wallet, projectId, milestoneId, voteType, voteTokens)
-
-            if (res.txId) {
-                console.log(`[GovernancePanel] Vote TX Broadcasted: ${res.txId}`)
-                // Optionally show a success toast or update a 'votes' list
-            }
-
-            // Re-sync UI (Blockchain might take a few seconds to update, but we trigger a refresh)
-            setTimeout(() => refreshState(), 2000)
+            // Record vote in mockDB
+            mockDB.insert('votes', {
+                milestone_id: milestoneId,
+                voter: address,
+                vote: voteType,
+                created_at: new Date().toISOString()
+            })
+            
+            // Artificial delay for UX
+            await new Promise(r => setTimeout(r, 800))
+            refreshState()
         } catch (e) {
             setError(e.message)
         } finally {
@@ -145,229 +111,62 @@ export default function GovernancePanel({ wallet, projectId, milestones = [], on
         }
     }
 
-    const handleRelease = async (milestoneId, amountBch) => {
-        setError('')
-        setReleaseId(milestoneId)
-        try {
-            const txId = await releaseMilestoneFunds(wallet, amountBch, PROJECT_ADDRESS)
-            setReleaseTxId(prev => ({ ...prev, [milestoneId]: txId }))
-            if (onTransaction) {
-                onTransaction(amountBch, txId, 'release')
-            }
-            refreshState()
-        } catch (e) {
-            setError(e.message || 'Release failed')
-        } finally {
-            setReleaseId(null)
-        }
-    }
-
     return (
         <div className="mb-6 space-y-4">
             <div className="card-glass rounded-2xl p-6">
-                <WeekBadge />
-                <div className="grid grid-cols-2 gap-4 mt-5 mb-5">
-                    <div className="rounded-xl p-4 text-center" style={{ background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.2)' }}>
-                        <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">GOV Tokens</p>
-                        <p className="text-2xl font-bold" style={{ color: '#10b981' }}>{tokenBal}</p>
-                        <p className="text-xs text-slate-500 mt-0.5">= {tokenBal} votes</p>
+                <div className="flex items-center gap-3 mb-6">
+                    <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-emerald-500/10 border border-emerald-500/30">
+                        <span className="text-xl">🗳️</span>
                     </div>
-                    <div className="rounded-xl p-4 text-center" style={{ background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.2)' }}>
-                        <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Locked BCH</p>
-                        <p className="text-2xl font-bold" style={{ color: '#10b981' }}>{lockedBch.toFixed(8)}</p>
-                        <p className="text-xs text-slate-500 mt-0.5">in contract</p>
+                    <div>
+                        <h2 className="text-white font-bold text-base">HashKey Governance</h2>
+                        <p className="text-slate-500 text-xs">Voting Power derived from HSK balance</p>
                     </div>
                 </div>
 
-                <div className="rounded-xl p-4" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
-                    <p className="text-white font-semibold text-sm mb-1 flex items-center gap-2">
-                        <span>🪙</span> Step 1 — Lock BCH &amp; Mint Governance Tokens
-                    </p>
-                    <p className="text-slate-500 text-xs mb-3 leading-relaxed">
-                        Lock BCH into the milestone contract. You receive <strong className="text-emerald-400">100 GOV tokens per 0.001 BCH</strong> — each token = 1 vote.
-                    </p>
-
-                    <div className="flex gap-3">
-                        <div className="relative flex-1">
-                            <input
-                                id="mint-amount-input"
-                                type="number"
-                                min="0.001"
-                                step="0.001"
-                                value={mintAmt}
-                                onChange={e => setMintAmt(e.target.value)}
-                                className="input-web3 pr-14"
-                                disabled={mintLoading}
-                            />
-                            <span className="absolute right-4 top-1/2 -translate-y-1/2 text-sm font-bold" style={{ color: '#10b981' }}>BCH</span>
-                        </div>
-                        <button
-                            id="mint-tokens-btn"
-                            onClick={handleMint}
-                            disabled={mintLoading}
-                            className="px-5 py-3 rounded-xl font-bold text-white gradient-btn-green flex items-center gap-2 disabled:opacity-60"
-                        >
-                            {mintLoading ? <><Spinner /> Minting…</> : '⚡ Lock & Mint'}
-                        </button>
+                <div className="grid grid-cols-2 gap-4 mb-4">
+                    <div className="bg-emerald-500/5 border border-emerald-500/10 rounded-xl p-4 text-center">
+                        <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mb-1">Voting Power</p>
+                        <p className="text-2xl font-bold text-emerald-400">{tokenBal}</p>
                     </div>
-
-                    {mintResult && (
-                        <div className="mt-3 p-3 rounded-xl" style={{ background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.25)' }}>
-                            <p className="text-emerald-300 text-xs font-semibold mb-1">✅ Tokens Minted!</p>
-                            <p className="text-slate-400 text-xs">You received <strong className="text-emerald-400">{mintResult.tokenAmount} GOV tokens</strong></p>
-                            <p className="text-slate-500 text-xs mt-0.5 font-mono break-all">
-                                Token ID: {mintResult.tokenCategory.slice(0, 16)}...
-                            </p>
-                            <a
-                                href={chipnetExplorerUrl(mintResult.simulatedTxId)}
-                                target="_blank" rel="noreferrer"
-                                className="text-emerald-400 text-xs underline"
-                            >
-                                View on Explorer ↗
-                            </a>
-                        </div>
-                    )}
+                    <div className="bg-blue-500/5 border border-blue-500/10 rounded-xl p-4 text-center">
+                        <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mb-1">Locked HSK</p>
+                        <p className="text-2xl font-bold text-blue-400">{lockedHsk.toFixed(4)}</p>
+                    </div>
                 </div>
-            </div>
 
-            {milestones.length > 0 && (
-                <div className="card-glass rounded-2xl p-6">
-                    <p className="text-white font-semibold text-sm mb-1 flex items-center gap-2">
-                        <span>🗳️</span> Step 2 — Token-Weighted Governance Voting
-                    </p>
-                    <p className="text-slate-500 text-xs mb-4 leading-relaxed">
-                        Use your GOV tokens to vote on milestones. &gt;50% YES unlocks release.
-                    </p>
-
-                    <div className="flex items-center gap-3 mb-5 p-3 rounded-xl" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
-                        <span className="text-slate-400 text-xs">Tokens per vote:</span>
-                        {[1, 5, 10, 25].map(n => (
-                            <button
-                                key={n}
-                                onClick={() => setVoteTokens(n)}
-                                className="px-3 py-1 rounded-lg text-xs font-bold transition-all"
-                                style={{
-                                    background: voteTokens === n ? 'rgba(16,185,129,0.3)' : 'rgba(16,185,129,0.08)',
-                                    border: `1px solid ${voteTokens === n ? 'rgba(16,185,129,0.6)' : 'rgba(16,185,129,0.2)'}`,
-                                    color: voteTokens === n ? '#d1fae5' : '#10b981',
-                                }}
-                            >
-                                {n}
-                            </button>
-                        ))}
-                    </div>
-
-                    <div className="space-y-4">
-                        {milestones.map((m, idx) => {
-                            const votes = milestoneVotes[m.id] || { yes: 0, no: 0 }
-                            const total = votes.yes + votes.no
-                            // Check DB approval flag OR status string OR on-chain tally
-                            const approved =
-                                m.approved === true ||
-                                m.status === 'Approved' || m.status === 'approved' ||
-                                (total > 0 && (votes.yes / total) > 0.5)
-                            const txId = releaseTxId[m.id]
-
-                            return (
-                                <div
-                                    key={m.id}
-                                    className="rounded-xl p-4"
-                                    style={{
-                                        background: approved ? 'rgba(16,185,129,0.07)' : 'rgba(255,255,255,0.03)',
-                                        border: `1px solid ${approved ? 'rgba(16,185,129,0.25)' : 'rgba(255,255,255,0.08)'}`,
-                                    }}
-                                >
-                                    <div className="flex items-center justify-between mb-3">
-                                        <div className="flex items-center gap-2">
-                                            <span className="w-6 h-6 rounded-md flex items-center justify-center text-xs font-bold"
-                                                style={{ background: approved ? 'rgba(16,185,129,0.2)' : 'rgba(16,185,129,0.2)', color: approved ? '#10b981' : '#34d399' }}>
-                                                {approved ? '✓' : idx + 1}
-                                            </span>
-                                            <span className="text-white text-sm font-semibold">{m.title}</span>
-                                        </div>
-                                        <span
-                                            className="text-xs font-bold px-2 py-0.5 rounded-full"
-                                            style={{
-                                                background: approved ? 'rgba(16,185,129,0.15)' : 'rgba(251,191,36,0.1)',
-                                                color: approved ? '#10b981' : '#fbbf24',
-                                                border: `1px solid ${approved ? 'rgba(16,185,129,0.3)' : 'rgba(251,191,36,0.2)'}`,
-                                            }}
-                                        >
-                                            {approved ? '✅ Approved' : '⏳ Voting'}
-                                        </span>
-                                    </div>
-
-                                    {total > 0 && <VoteBar votes={votes} />}
-
-                                    {!approved && (
-                                        <div className="flex gap-2">
-                                            <button
-                                                onClick={() => handleVote(m.id, 'yes')}
-                                                disabled={voteLoading === m.id + 'yes' || tokenBal < voteTokens}
-                                                className="flex-1 py-2 rounded-xl font-bold text-sm text-white gradient-btn-green flex items-center justify-center gap-1.5 disabled:opacity-50"
-                                            >
-                                                {voteLoading === m.id + 'yes' ? <Spinner /> : '👍'} YES
-                                            </button>
-                                            <button
-                                                onClick={() => handleVote(m.id, 'no')}
-                                                disabled={voteLoading === m.id + 'no' || tokenBal < voteTokens}
-                                                className="flex-1 py-2 rounded-xl font-bold text-sm text-white flex items-center justify-center gap-1.5 disabled:opacity-50"
-                                                style={{ background: 'rgba(225,29,72,0.1)', border: '1px solid rgba(225,29,72,0.2)', color: '#f43f5e' }}
-                                            >
-                                                {voteLoading === m.id + 'no' ? <Spinner /> : '👎'} NO
-                                            </button>
-                                        </div>
-                                    )}
-
-                                    {approved && !txId && (
-                                        <button
-                                            onClick={() => handleRelease(m.id, 0.001)}
-                                            disabled={releaseId === m.id}
-                                            className="w-full py-2.5 rounded-xl font-bold text-sm text-white flex items-center justify-center gap-2 disabled:opacity-60"
-                                            style={{ background: 'linear-gradient(135deg, #10b981, #059669)' }}
-                                        >
-                                            {releaseId === m.id ? <><Spinner /> Releasing…</> : '🚀 Release 0.001 BCH'}
-                                        </button>
-                                    )}
-
-                                    {txId && (
-                                        <div className="mt-2 text-center">
-                                            <a href={chipnetExplorerUrl(txId)} target="_blank" rel="noreferrer" className="text-emerald-400 text-xs underline">
-                                                View Release on Explorer ↗
-                                            </a>
-                                        </div>
-                                    )}
+                <div className="space-y-4">
+                    {milestones.map((m, i) => {
+                        const votes = milestoneVotes[m.id] || { yes: 0, no: 0 }
+                        return (
+                            <div key={m.id} className="bg-white/5 border border-white/10 rounded-xl p-4">
+                                <div className="flex items-center justify-between mb-3">
+                                    <span className="text-white font-semibold text-sm">Milestone #{i+1}: {m.title}</span>
+                                    <span className="text-[10px] bg-slate-800 text-slate-400 px-2 py-0.5 rounded-full border border-slate-700">ACTIVE</span>
                                 </div>
-                            )
-                        })}
-                    </div>
+                                <VoteBar yes={votes.yes} no={votes.no} />
+                                <div className="flex gap-2">
+                                    <button
+                                        onClick={() => handleVote(m.id, 'yes')}
+                                        disabled={voteLoading}
+                                        className="flex-1 py-1.5 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 rounded-lg text-xs font-bold hover:bg-emerald-500/20 transition-all flex items-center justify-center gap-2"
+                                    >
+                                        {voteLoading === m.id + 'yes' ? <Spinner /> : 'YES'}
+                                    </button>
+                                    <button
+                                        onClick={() => handleVote(m.id, 'no')}
+                                        disabled={voteLoading}
+                                        className="flex-1 py-1.5 bg-red-500/10 border border-red-500/20 text-red-400 rounded-lg text-xs font-bold hover:bg-red-500/20 transition-all flex items-center justify-center gap-2"
+                                    >
+                                        {voteLoading === m.id + 'no' ? <Spinner /> : 'NO'}
+                                    </button>
+                                </div>
+                            </div>
+                        )
+                    })}
                 </div>
-            )}
-
-            {error && (
-                <div className="p-3 rounded-xl flex items-center gap-3" style={{ background: 'rgba(225,29,72,0.08)', border: '1px solid rgba(225,29,72,0.25)' }}>
-                    <span className="text-rose-400">⚠</span>
-                    <p className="text-rose-300 text-sm flex-1">{error}</p>
-                    <button onClick={() => setError('')} className="text-rose-400 hover:text-rose-200">×</button>
-                </div>
-            )}
-        </div>
-    )
-}
-
-function WeekBadge() {
-    return (
-        <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
-                style={{ background: 'rgba(16,185,129,0.15)', border: '1px solid rgba(16,185,129,0.3)' }}>
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-                    <path d="M12 2L3 12L12 22L21 12L12 2Z" stroke="#10b981" strokeWidth="2" />
-                </svg>
             </div>
-            <div>
-                <h2 className="text-white font-bold text-base">Bitcoin Cash Governance</h2>
-                <p className="text-slate-500 text-xs">Chipnet Testnet · Cash Tokens Simulation</p>
-            </div>
+            {error && <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-red-400 text-xs">{error}</div>}
         </div>
     )
 }

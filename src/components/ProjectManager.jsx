@@ -2,18 +2,10 @@
  * src/components/ProjectManager.jsx
  *
  * ── What this component does ──────────────────────────────────────────────────
- * 1. On mount → fetchProjects() → displays all projects from Supabase
+ * 1. On mount → loadProjects() → displays all projects from mock database
  * 2. On form submit → createProject() → inserts new row → optimistically
  *    prepends new project to React state (no page reload needed)
  * 3. Handles loading, error, and empty states
- *
- * ── How to use ────────────────────────────────────────────────────────────────
-/**
- * Drop <ProjectManager walletAddress="0x..." /> into any page.
- * The walletAddress prop is set as the owner_wallet of each new project.
- *
- * ── Dependencies ─────────────────────────────────────────────────────────────
- * npm install @supabase/supabase-js  (already installed in this project)
  */
 
 import React, { useState, useEffect, useCallback } from 'react'
@@ -104,7 +96,7 @@ export default function ProjectManager({ walletAddress = '' }) {
 
         setSubmitting(true)
 
-        // ── Insert into Supabase ──────────────────────────────────────────────
+        // ── Insert into database ──────────────────────────────────────────────
         const { data: newProject, error: insertErr } = await createProject({
             title: form.title,
             description: form.description,
@@ -121,7 +113,7 @@ export default function ProjectManager({ walletAddress = '' }) {
         }
 
         // ── Optimistic prepend ────────────────────────────────────────────────
-        // Supabase returned the full inserted row (with server-generated id + created_at).
+        // database returned the full inserted row (with server-generated id + created_at).
         // Prepend it to local state so it appears instantly at the top of the list
         // without requiring a full re-fetch.
         setProjects(prev => [newProject, ...prev])
@@ -277,7 +269,7 @@ export default function ProjectManager({ walletAddress = '' }) {
                             <p style={{ color: '#f87171', fontWeight: 700, marginBottom: '4px' }}>Could not load projects</p>
                             <p style={{ color: '#94a3b8', fontSize: '0.82rem' }}>{error}</p>
                             <p style={{ color: '#475569', fontSize: '0.75rem', marginTop: '8px' }}>
-                                → Check your .env keys · Make sure schema.sql was run in Supabase
+                                → Check your database logic.
                             </p>
                         </div>
                     </div>

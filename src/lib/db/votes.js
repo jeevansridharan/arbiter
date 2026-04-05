@@ -1,100 +1,45 @@
 /**
- * src/lib/db/votes.js
- *
- * All Supabase operations for the `votes` table.
- *
- * Schema (run in Supabase SQL Editor):
- *   CREATE TABLE votes (
- *     id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
- *     milestone_id UUID NOT NULL REFERENCES milestones(id) ON DELETE CASCADE,
- *     voter_id     UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
- *     vote         BOOLEAN NOT NULL,       -- true = YES,  false = NO
- *     voting_power INTEGER NOT NULL DEFAULT 1,
- *     created_at   TIMESTAMPTZ DEFAULT now(),
- *     UNIQUE(milestone_id, voter_id)       -- one vote per user per milestone
- *   );
- *   ALTER TABLE votes ENABLE ROW LEVEL SECURITY;
- *   CREATE POLICY "Public read"   ON votes FOR SELECT USING (true);
- *   CREATE POLICY "Voter insert"  ON votes FOR INSERT WITH CHECK (true);
- *   -- Note: no update/delete — votes are immutable once cast
+ * src/lib/db/votes.js (REPLACED - MOCK DB VERSION)
  */
 
-import { supabase } from '../supabase'
+import { mockDB } from './mockDB'
 import { updateMilestoneStatus } from './milestones'
 
-function requireSupabase() {
-    if (!supabase) throw new Error('Supabase is not configured. Please add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY to your .env file.')
-}
-
-// Threshold for governance approval (>50%)
+const TABLE = 'votes'
 const APPROVAL_THRESHOLD = 0.5
 
-// ─────────────────────────────────────────────────────────────────────────────
+const delay = (ms = 100) => new Promise(resolve => setTimeout(resolve, ms))
 
-/**
- * voteOnMilestone({ milestoneId, voterId, vote, votingPower })
- *
- * Casts a vote on a milestone. Each user can vote only once per milestone
- * (enforced by the UNIQUE constraint). After inserting, checks if the
- * milestone has now passed the approval threshold and auto-updates its status.
- *
- * @param {object}  params
- * @param {string}  params.milestoneId  UUID of the milestone
- * @param {string}  params.voterId      UUID of the voter (from users table)
- * @param {boolean} params.vote         true = YES, false = NO
- * @param {number}  [params.votingPower=1]  Token weight (GOV tokens used)
- * @returns {Promise<{ voteRecord, milestoneApproved, yesPercent }>}
- */
 export async function voteOnMilestone({ milestoneId, voterId, vote, votingPower = 1 }) {
-    if (!milestoneId) throw new Error('milestoneId is required')
-    if (!voterId) throw new Error('voterId is required')
-    if (typeof vote !== 'boolean') throw new Error('vote must be a boolean (true=YES, false=NO)')
-    if (votingPower < 1) throw new Error('votingPower must be at least 1')
+    await delay()
+    if (!milestoneId || !voterId) throw new Error('milestoneId and voterId are required')
 
-    // ── 1. Insert the vote ────────────────────────────────────────────────────
-    // DB uses wallet_address TEXT + token_amount NUMERIC (not voter_id FK)
-    const { data: voteRecord, error: insertError } = await supabase
-        .from('votes')
-        .insert({
-            milestone_id: milestoneId,
-            wallet_address: voterId,        // voterId used as wallet address string
-            vote,
-            token_amount: votingPower,    // ← DB column name
-        })
-        .select()
-        .single()
-
-    if (insertError) {
-        // Unique constraint violation = user already voted
-        if (insertError.code === '23505') {
-            throw new Error('You have already voted on this milestone.')
-        }
-        console.error('[db/votes] voteOnMilestone insert error:', insertError)
-        throw new Error(insertError.message)
+    // Check if already voted
+    const existing = mockDB.where(TABLE, 'milestone_id', milestoneId)
+        .find(v => v.wallet_address === voterId.toLowerCase())
+    
+    if (existing) {
+        throw new Error('You have already voted on this milestone.')
     }
 
-    // ── 2. Recalculate vote tallies for this milestone ────────────────────────
-    const { data: allVotes, error: fetchError } = await supabase
-        .from('votes')
-        .select('vote, token_amount')   // ← correct column name
-        .eq('milestone_id', milestoneId)
+    const voteRecord = mockDB.insert(TABLE, {
+        milestone_id: milestoneId,
+        wallet_address: voterId.toLowerCase(),
+        vote,
+        token_amount: Number(votingPower),
+    })
 
-    if (fetchError) {
-        console.error('[db/votes] voteOnMilestone fetch votes error:', fetchError)
-        throw new Error(fetchError.message)
-    }
-
-    const yesWeight = allVotes.filter(v => v.vote === true).reduce((s, v) => s + v.token_amount, 0)
-    const noWeight = allVotes.filter(v => v.vote === false).reduce((s, v) => s + v.token_amount, 0)
+    // Recalculate
+    const allVotes = mockDB.where(TABLE, 'milestone_id', milestoneId)
+    const yesWeight = allVotes.filter(v => v.vote === true).reduce((s, v) => s + Number(v.token_amount || 0), 0)
+    const noWeight = allVotes.filter(v => v.vote === false).reduce((s, v) => s + Number(v.token_amount || 0), 0)
     const total = yesWeight + noWeight
     const yesPercent = total > 0 ? Math.round((yesWeight / total) * 100) : 0
     const milestoneApproved = total > 0 && (yesWeight / total) > APPROVAL_THRESHOLD
 
-    // ── 3. Auto-update milestone status if threshold reached ──────────────────
     if (milestoneApproved) {
         await updateMilestoneStatus(milestoneId, 'approved')
     } else if (total > 0) {
-        // Voting has started but not yet passed
         await updateMilestoneStatus(milestoneId, 'voting')
     }
 
@@ -108,59 +53,18 @@ export async function voteOnMilestone({ milestoneId, voterId, vote, votingPower 
     }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-
-/**
- * getVotesByMilestone(milestoneId)
- *
- * Returns all votes for a milestone including voter wallet addresses.
- * Useful for displaying a vote history list.
- *
- * @param   {string} milestoneId
- * @returns {Promise<VoteWithVoter[]>}
- */
 export async function getVotesByMilestone(milestoneId) {
+    await delay()
     if (!milestoneId) throw new Error('milestoneId is required')
 
-    const { data, error } = await supabase
-        .from('votes')
-        .select('*')          // wallet_address is the voter identifier
-        .eq('milestone_id', milestoneId)
-        .order('created_at', { ascending: false })
-
-    if (error) {
-        console.error('[db/votes] getVotesByMilestone error:', error)
-        throw new Error(error.message)
-    }
-
-    return data ?? []
+    const data = mockDB.where(TABLE, 'milestone_id', milestoneId)
+    return data.sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-
-/**
- * hasUserVoted(milestoneId, voterId)
- *
- * Quick check — returns true if this user has already cast a vote on this milestone.
- * Use this to disable the Vote buttons in the UI.
- *
- * @param   {string} milestoneId
- * @param   {string} voterId
- * @returns {Promise<boolean>}
- */
 export async function hasUserVoted(milestoneId, voterId) {
+    await delay()
     if (!milestoneId || !voterId) return false
 
-    const { count, error } = await supabase
-        .from('votes')
-        .select('id', { count: 'exact', head: true })
-        .eq('milestone_id', milestoneId)
-        .eq('wallet_address', voterId)   // ← DB column is wallet_address
-
-    if (error) {
-        console.error('[db/votes] hasUserVoted error:', error)
-        return false
-    }
-
-    return (count ?? 0) > 0
+    const votes = mockDB.where(TABLE, 'milestone_id', milestoneId)
+    return votes.some(v => v.wallet_address === voterId.toLowerCase())
 }

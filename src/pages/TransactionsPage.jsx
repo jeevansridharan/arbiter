@@ -5,7 +5,7 @@
 
 import React, { useState, useEffect } from 'react'
 import { ArrowUpRight, ArrowDownLeft, RotateCcw, ExternalLink, Clock } from 'lucide-react'
-import { supabase, supabaseConfigured } from '../lib/supabase'
+import { mockDB } from '../lib/db/mockDB'
 
 // ── Badge per type ────────────────────────────────────────────────────────────
 const TYPE_META = {
@@ -16,7 +16,7 @@ const TYPE_META = {
 
 function TxRow({ tx }) {
     const meta = TYPE_META[tx.type] ?? TYPE_META.funding
-    const explorerUrl = `https://chipnet.imaginary.cash/tx/${tx.tx_hash}`
+    const explorerUrl = `https://hashkeychain-testnet-explorer.alt.technology/tx/${tx.tx_hash}`
     const date = new Date(tx.created_at).toLocaleString()
 
     return (
@@ -54,7 +54,7 @@ function TxRow({ tx }) {
                 <p style={{ fontSize: '1rem', fontWeight: 800, color: meta.color }}>
                     {parseFloat(tx.amount).toFixed(8)}
                 </p>
-                <p style={{ fontSize: '0.72rem', color: '#475569', fontWeight: 600 }}>BCH</p>
+                <p style={{ fontSize: '0.72rem', color: '#475569', fontWeight: 600 }}>HSK</p>
             </div>
 
             {/* Date */}
@@ -78,21 +78,16 @@ export default function TransactionsPage() {
     const [error, setError] = useState(null)
 
     useEffect(() => {
-        if (!supabaseConfigured) {
-            setError('Supabase not configured — add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY to your .env file.')
-            setLoading(false)
-            return
-        }
         async function load() {
             setLoading(true)
             try {
-                const { data, error } = await supabase
-                    .from('transactions')
-                    .select('*, projects(title)')
-                    .order('created_at', { ascending: false })
-                    .limit(50)
-                if (error) throw error
-                setTxs(data ?? [])
+                const transactions = mockDB.getAll('transactions')
+                // Add project names
+                const data = transactions.map(tx => {
+                    const project = mockDB.getById('projects', tx.project_id)
+                    return { ...tx, projects: project ? { title: project.title } : null }
+                })
+                setTxs(data.sort((a, b) => new Date(b.created_at) - new Date(a.created_at)))
             } catch (e) {
                 setError(e.message)
             } finally {
@@ -110,7 +105,7 @@ export default function TransactionsPage() {
                     Transactions
                 </h1>
                 <p style={{ color: '#64748b', fontSize: '0.9rem' }}>
-                    All on-chain BCH activity recorded on Chipnet
+                    All activity recorded on HashKey Chain Testnet
                 </p>
             </div>
 

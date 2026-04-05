@@ -1,13 +1,11 @@
 /**
  * pages/ProfilePage.jsx
- * Wallet identity + account overview (Non-Custodial Refactor)
+ * EVM Wallet identity + account overview (HashKey Chain)
  */
 
 import React, { useState, useEffect } from 'react'
 import { Copy, CheckCircle, Wallet, Shield, ExternalLink, LogOut } from 'lucide-react'
-import { initializeWallet, getBalance, getTokenBalance, disconnectWallet } from '../services/bchWallet'
-import { getLockedAmount } from '../services/milestoneContract'
-import { transferGovTokens } from '../services/govService'
+import { initializeWallet, getBalance, disconnectWallet, getExplorerUrl } from '../services/evmWallet'
 
 // ── Info row ──────────────────────────────────────────────────────────────────
 function InfoRow({ label, value, mono = false, color = '#94a3b8' }) {
@@ -26,36 +24,24 @@ export default function ProfilePage() {
     const [address, setAddress] = useState('')
     const [copied, setCopied] = useState(false)
     const [balance, setBalance] = useState(0)
-    const [tokens, setTokens] = useState(0)
-    const [locked, setLocked] = useState(0)
     const [loading, setLoading] = useState(false)
-
-    // Token transfer state
-    const [recipient, setRecipient] = useState('')
-    const [sendAmount, setSendAmount] = useState('')
-    const [txLoading, setTxLoading] = useState(false)
-    const [txStatus, setTxStatus] = useState({ type: '', msg: '', txId: '' })
 
     useEffect(() => {
         const loadConnectedWallet = async () => {
-            const storedWif = localStorage.getItem('milestara_chipnet_wif')
-            if (storedWif) {
+            const storedKey = localStorage.getItem('arbit_evm_private_key')
+            if (storedKey) {
                 setLoading(true)
                 try {
-                    const wallet = await initializeWallet(storedWif)
-                    setAddress(wallet.cashaddr)
-                    const bal = await getBalance(wallet)
+                    const wallet = await initializeWallet(storedKey)
+                    setAddress(wallet.address)
+                    const bal = await getBalance(wallet.address)
                     setBalance(bal)
-
-                    const tks = await getTokenBalance(wallet)
-                    setTokens(tks)
                 } catch (err) {
                     console.error('[ProfilePage] Failed to reconnect wallet:', err)
                 } finally {
                     setLoading(false)
                 }
             }
-            setLocked(getLockedAmount())
         }
         loadConnectedWallet()
     }, [])
@@ -70,9 +56,7 @@ export default function ProfilePage() {
     const handleDisconnect = () => {
         disconnectWallet()
         setAddress('')
-        setTokens(0)
-        setLocked(0)
-        // Clear session
+        setBalance(0)
         window.location.reload()
     }
 
@@ -83,51 +67,47 @@ export default function ProfilePage() {
                 <h1 style={{ fontSize: '1.75rem', fontWeight: 800, color: '#f1f5f9', letterSpacing: '-0.03em', marginBottom: '6px' }}>
                     Profile
                 </h1>
-                <p style={{ color: '#64748b', fontSize: '0.9rem' }}>Your non-custodial wallet identity</p>
+                <p style={{ color: '#64748b', fontSize: '0.9rem' }}>Your decentralized identity on HashKey Chain</p>
             </div>
 
             {/* Wallet card */}
-            <div style={{ background: 'rgba(15,17,35,0.85)', border: '1px solid rgba(16,185,129,0.2)', borderRadius: '16px', padding: '28px', backdropFilter: 'blur(20px)', marginBottom: '20px' }}>
-                {/* Avatar */}
+            <div style={{ background: 'rgba(15,17,35,0.85)', border: '1px solid rgba(59,130,246,0.2)', borderRadius: '16px', padding: '28px', backdropFilter: 'blur(20px)', marginBottom: '20px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '24px' }}>
-                    <div style={{ width: '60px', height: '60px', borderRadius: '16px', background: 'linear-gradient(135deg, #10b981, #059669)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 0 24px rgba(16,185,129,0.4)' }}>
+                    <div style={{ width: '60px', height: '60px', borderRadius: '16px', background: 'linear-gradient(135deg, #3b82f6, #2563eb)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 0 24px rgba(59,130,246,0.3)' }}>
                         <Wallet size={26} color="white" />
                     </div>
                     <div>
-                        <p style={{ color: '#f1f5f9', fontWeight: 800, fontSize: '1.1rem' }}>BCH Wallet</p>
+                        <p style={{ color: '#f1f5f9', fontWeight: 800, fontSize: '1.1rem' }}>EVM Wallet</p>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '4px' }}>
-                            <div style={{ width: '7px', height: '7px', borderRadius: '50%', background: address ? '#10b981' : '#475569', boxShadow: address ? '0 0 6px rgba(16,185,129,0.8)' : 'none' }} />
-                            <span style={{ fontSize: '0.75rem', color: address ? '#10b981' : '#475569', fontWeight: 600 }}>
-                                {address ? 'Active Session · Chipnet' : 'Session Inactive'}
+                            <div style={{ width: '7px', height: '7px', borderRadius: '50%', background: address ? '#3b82f6' : '#475569', boxShadow: address ? '0 0 6px rgba(59,130,246,0.8)' : 'none' }} />
+                            <span style={{ fontSize: '0.75rem', color: address ? '#3b82f6' : '#475569', fontWeight: 600 }}>
+                                {address ? 'Active Session · HashKey' : 'Session Inactive'}
                             </span>
                         </div>
                     </div>
                 </div>
 
-                {/* Details */}
                 {address ? (
                     <>
-                        <InfoRow label="Wallet Address" value={address} mono color="#10b981" />
-                        <InfoRow label="BCH Balance" value={`${balance.toFixed(8)} BCH`} color="#10b981" />
-                        <InfoRow label="Network" value="Bitcoin Cash Chipnet (Testnet)" color="#34d399" />
-                        <InfoRow label="Session GOV Tokens" value={`${tokens} tokens`} color="#10b981" />
-                        <InfoRow label="Locked BCH" value={`${locked.toFixed(8)} BCH`} color="#34d399" />
+                        <InfoRow label="Wallet Address" value={address} mono color="#3b82f6" />
+                        <InfoRow label="HSK Balance" value={`${balance.toFixed(4)} HSK`} color="#3b82f6" />
+                        <InfoRow label="Network" value="HashKey Chain Testnet" color="#60a5fa" />
 
                         <div style={{ display: 'flex', gap: '10px', marginTop: '20px' }}>
                             <button
                                 onClick={handleCopy}
                                 style={{
                                     flex: 1, padding: '10px', borderRadius: '10px', cursor: 'pointer',
-                                    background: copied ? 'rgba(16,185,129,0.15)' : 'rgba(16,185,129,0.1)',
-                                    border: copied ? '1px solid rgba(16,185,129,0.3)' : '1px solid rgba(16,185,129,0.25)',
-                                    color: copied ? '#10b981' : '#34d399', fontWeight: 700, fontSize: '0.82rem',
+                                    background: copied ? 'rgba(59,130,246,0.15)' : 'rgba(59,130,246,0.1)',
+                                    border: copied ? '1px solid rgba(59,130,246,0.3)' : '1px solid rgba(59,130,246,0.25)',
+                                    color: copied ? '#60a5fa' : '#3b82f6', fontWeight: 700, fontSize: '0.82rem',
                                     display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', transition: 'all 0.2s',
                                 }}
                             >
                                 {copied ? <><CheckCircle size={14} /> Copied!</> : <><Copy size={14} /> Copy Address</>}
                             </button>
                             <a
-                                href={`https://chipnet.imaginary.cash/address/${address}`}
+                                href={`https://hashkeychain-testnet-explorer.alt.technology/address/${address}`}
                                 target="_blank" rel="noreferrer"
                                 style={{
                                     flex: 1, padding: '10px', borderRadius: '10px', cursor: 'pointer',
@@ -144,7 +124,7 @@ export default function ProfilePage() {
                 ) : (
                     <div style={{ textAlign: 'center', padding: '20px 0' }}>
                         <p style={{ color: '#475569', fontSize: '0.875rem', marginBottom: '16px' }}>
-                            Go to <strong style={{ color: '#10b981' }}>Projects</strong> and connect your wallet to see your profile details.
+                            Connect your wallet to see your profile details.
                         </p>
                     </div>
                 )}
@@ -155,123 +135,31 @@ export default function ProfilePage() {
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '14px' }}>
                     <Shield size={16} color="#fbbf24" />
                     <h2 style={{ color: '#fbbf24', fontWeight: 700, fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                        Security Protocol
+                        Autonomous Security
                     </h2>
                 </div>
                 {[
-                    'Non-Custodial: Your private keys are stored securely in your browser\'s local storage.',
-                    'Persistent: Your wallet stays active across page refreshes and browser restarts.',
-                    'This is a TESTNET wallet. Do not send real BCH to these addresses.',
-                    'Identity Persistence: To remove the wallet, you must click the Disconnect button.',
+                    'Non-Custodial: Your keys, your funds. We never store them on our servers.',
+                    'HashKey Chain: All interactions are secured by the HashKey L2 ecosystem.',
+                    'Testnet Warning: This is a dev environment. Use only testnet HSK.',
+                    'Identity: Your profile is derived from your connected EVM wallet.',
                 ].map((note, i) => (
                     <p key={i} style={{ color: '#64748b', fontSize: '0.8rem', lineHeight: 1.7 }}>• {note}</p>
                 ))}
             </div>
 
-            {/* Disconnect */}
             {address && (
                 <button
                     onClick={handleDisconnect}
                     style={{
                         width: '100%', padding: '12px', borderRadius: '12px', cursor: 'pointer',
-                        background: 'rgba(225,29,72,0.07)', border: '1px solid rgba(225,29,72,0.2)',
+                        background: 'rgba(239,68,68,0.07)', border: '1px solid rgba(239,68,68,0.2)',
                         color: '#f87171', fontWeight: 700, fontSize: '0.875rem',
                         display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', transition: 'all 0.2s',
                     }}
                 >
-                    <LogOut size={16} /> Disconnect &amp; Remove Wallet
+                    <LogOut size={16} /> Disconnect Wallet
                 </button>
-            )}
-
-            {/* ── Token Transfer Section ────────────────────────────────────────── */}
-            {address && (
-                <div style={{ background: 'rgba(15,17,35,0.85)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '16px', padding: '24px', backdropFilter: 'blur(20px)', marginTop: '20px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
-                        <CheckCircle size={16} color="#10b981" />
-                        <h2 style={{ color: '#f1f5f9', fontWeight: 700, fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                            Send GOV Tokens
-                        </h2>
-                    </div>
-
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                            <label style={{ color: '#475569', fontSize: '0.72rem', fontWeight: 600, textTransform: 'uppercase' }}>Recipient Address</label>
-                            <input
-                                type="text"
-                                placeholder="bchtest:..."
-                                value={recipient}
-                                onChange={(e) => setRecipient(e.target.value)}
-                                style={{
-                                    background: 'rgba(15,17,35,0.6)', border: '1px solid rgba(255,255,255,0.08)',
-                                    borderRadius: '10px', padding: '10px 14px', color: '#f1f5f9', fontSize: '0.85rem', outline: 'none'
-                                }}
-                            />
-                        </div>
-
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                            <label style={{ color: '#475569', fontSize: '0.72rem', fontWeight: 600, textTransform: 'uppercase' }}>Amount (GOV)</label>
-                            <input
-                                type="number"
-                                placeholder="0"
-                                value={sendAmount}
-                                onChange={(e) => setSendAmount(e.target.value)}
-                                style={{
-                                    background: 'rgba(15,17,35,0.6)', border: '1px solid rgba(255,255,255,0.08)',
-                                    borderRadius: '10px', padding: '10px 14px', color: '#f1f5f9', fontSize: '0.85rem', outline: 'none'
-                                }}
-                            />
-                        </div>
-
-                        <button
-                            onClick={async () => {
-                                if (!recipient || !sendAmount || txLoading) return
-                                setTxLoading(true)
-                                setTxStatus({ type: '', msg: '', txId: '' })
-                                try {
-                                    const wallet = await initializeWallet()
-                                    const res = await transferGovTokens(wallet, recipient, parseInt(sendAmount))
-                                    setTxStatus({ type: 'success', msg: `Sent ${sendAmount} tokens!`, txId: res.txId })
-                                    setSendAmount('')
-                                    // Refresh balance
-                                    const tks = await getTokenBalance(wallet)
-                                    setTokens(tks)
-                                } catch (err) {
-                                    setTxStatus({ type: 'error', msg: err.message })
-                                } finally {
-                                    setTxLoading(false)
-                                }
-                            }}
-                            disabled={txLoading || !recipient || !sendAmount}
-                            style={{
-                                width: '100%', padding: '12px', borderRadius: '12px', cursor: 'pointer',
-                                background: 'linear-gradient(135deg, #10b981, #059669)', border: 'none',
-                                color: '#fff', fontWeight: 700, fontSize: '0.875rem',
-                                opacity: (txLoading || !recipient || !sendAmount) ? 0.5 : 1, transition: 'all 0.2s',
-                                marginTop: '8px'
-                            }}
-                        >
-                            {txLoading ? 'Broadcasting...' : 'Transfer Tokens'}
-                        </button>
-
-                        {txStatus.msg && (
-                            <div style={{
-                                marginTop: '12px', padding: '10px', borderRadius: '8px', fontSize: '0.8rem',
-                                background: txStatus.type === 'success' ? 'rgba(16,185,129,0.1)' : 'rgba(239,68,68,0.1)',
-                                border: `1px solid ${txStatus.type === 'success' ? 'rgba(16,185,129,0.3)' : 'rgba(239,68,68,0.3)'}`,
-                                color: txStatus.type === 'success' ? '#10b981' : '#f87171'
-                            }}>
-                                {txStatus.msg}
-                                {txStatus.txId && (
-                                    <div style={{ marginTop: '4px' }}>
-                                        <a href={`https://chipnet.imaginary.cash/tx/${txStatus.txId}`} target="_blank" rel="noreferrer" style={{ color: '#10b981', textDecoration: 'underline' }}>
-                                            View TX ↗
-                                        </a>
-                                    </div>
-                                )}
-                            </div>
-                        )}
-                    </div>
-                </div>
             )}
         </div>
     )

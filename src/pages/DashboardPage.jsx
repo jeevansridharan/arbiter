@@ -11,7 +11,7 @@ import {
     TrendingUp, Zap, Shield, ChevronRight,
     RefreshCw, Brain, Star, Award,
 } from 'lucide-react'
-import { supabase, supabaseConfigured } from '../lib/supabase'
+import { fetchProjects } from '../lib/db/projects'
 
 // ── Quick action card ─────────────────────────────────────────────────────────
 function QuickAction({ to, Icon, title, description, color, onClick }) {
@@ -51,18 +51,14 @@ export default function DashboardPage() {
     const [loading, setLoading] = useState(true)
 
     async function loadStats() {
-        if (!supabaseConfigured || !supabase) {
-            setLoading(false)
-            return
-        }
         setLoading(true)
         try {
-            const [projRes] = await Promise.all([
-                supabase.from('projects').select('raised_amount', { count: 'exact' }),
-            ])
+            const { data: projects, error } = await fetchProjects()
+            
+            if (error) throw error
 
-            const projectCount = projRes.count ?? 0
-            const totalRaised = (projRes.data ?? []).reduce(
+            const projectCount = projects?.length ?? 0
+            const totalRaised = (projects ?? []).reduce(
                 (sum, p) => sum + parseFloat(p.raised_amount || 0), 0
             )
 

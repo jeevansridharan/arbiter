@@ -1,132 +1,40 @@
 /**
- * src/lib/db/transactions.js
- *
- * All Supabase operations for the `transactions` table.
- *
- * This table is the on-chain ↔ off-chain bridge:
- * Every Chipnet transaction that matters gets recorded here.
- *
- * Schema (run in Supabase SQL Editor):
- *   CREATE TABLE transactions (
- *     id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
- *     project_id UUID NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
- *     tx_hash    TEXT NOT NULL,
- *     amount     NUMERIC(18, 8) NOT NULL,
- *     type       TEXT NOT NULL CHECK (type IN ('funding', 'release', 'refund')),
- *     created_at TIMESTAMPTZ DEFAULT now()
- *   );
- *   ALTER TABLE transactions ENABLE ROW LEVEL SECURITY;
- *   CREATE POLICY "Public read"   ON transactions FOR SELECT USING (true);
- *   CREATE POLICY "Anyone insert" ON transactions FOR INSERT WITH CHECK (true);
+ * src/lib/db/transactions.js (REPLACED - MOCK DB VERSION)
  */
 
-import { supabase } from '../supabase'
+import { mockDB } from './mockDB'
 
-function requireSupabase() {
-    if (!supabase) throw new Error('Supabase is not configured. Please add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY to your .env file.')
-}
+const TABLE = 'transactions'
 
-// ─────────────────────────────────────────────────────────────────────────────
+const delay = (ms = 150) => new Promise(resolve => setTimeout(resolve, ms))
 
-/**
- * Records a BCH on-chain transaction in the Supabase database.
- * Call this AFTER a successful broadcast on Chipnet.
- *
- * @param {object} params
- * @param {string} params.projectId  UUID of the project
- * @param {string} params.txHash     Chipnet transaction hash
- * @param {number} params.amount     BCH amount (e.g. 0.001)
- * @param {'funding'|'release'|'refund'} params.type  Type of transaction
- * @returns {Promise<Transaction>}
- */
 export async function insertTransaction({ projectId, txHash, amount, type, walletAddress }) {
-    if (!projectId) throw new Error('projectId is required')
-    if (!txHash) throw new Error('txHash is required')
-    if (!amount || amount <= 0) throw new Error('amount must be > 0')
-    if (!walletAddress) throw new Error('walletAddress is required')
+    await delay()
+    if (!projectId || !txHash || !walletAddress) throw new Error('Missing required transaction fields')
 
-    const validTypes = ['funding', 'release', 'refund']
-    if (!validTypes.includes(type)) {
-        throw new Error(`Invalid type. Must be one of: ${validTypes.join(', ')}`)
-    }
-
-    const payload = {
+    const data = mockDB.insert(TABLE, {
         project_id: projectId,
         tx_hash: txHash,
         wallet_address: walletAddress,
-        amount,
+        amount: Number(amount),
         type,
-    }
-
-    console.log('[db/transactions] 🚀 Attempting Supabase insert:', payload)
-
-    const { data, error } = await supabase
-        .from('transactions')
-        .insert(payload)
-        .select()
-        .single()
-
-    if (error) {
-        console.error('[db/transactions] insertTransaction error:', error)
-        throw new Error(error.message)
-    }
-
+    })
     return data
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-
-/**
- * fetchTransactionsByProject(projectId)
- *
- * Returns all transactions for a project, newest first.
- * Used to display the funding history panel.
- *
- * @param   {string} projectId
- * @returns {Promise<Transaction[]>}
- */
 export async function fetchTransactionsByProject(projectId) {
+    await delay()
     if (!projectId) throw new Error('projectId is required')
 
-    const { data, error } = await supabase
-        .from('transactions')
-        .select('*')
-        .eq('project_id', projectId)
-        .order('created_at', { ascending: false })
-
-    if (error) {
-        console.error('[db/transactions] fetchTransactionsByProject error:', error)
-        throw new Error(error.message)
-    }
-
-    return data ?? []
+    const data = mockDB.where(TABLE, 'project_id', projectId)
+    return data.sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-
-/**
- * getProjectFundingTotal(projectId)
- *
- * Returns the SUM of all 'funding' type transactions for a project.
- * Use this as the source of truth for how much ETH has been received on-chain.
- *
- * @param   {string} projectId
- * @returns {Promise<number>}   Total BCH funded (e.g. 0.025)
- */
 export async function getProjectFundingTotal(projectId) {
+    await delay()
     if (!projectId) throw new Error('projectId is required')
 
-    const { data, error } = await supabase
-        .from('transactions')
-        .select('amount')
-        .eq('project_id', projectId)
-        .eq('type', 'funding')
-
-    if (error) {
-        console.error('[db/transactions] getProjectFundingTotal error:', error)
-        throw new Error(error.message)
-    }
-
-    const total = (data ?? []).reduce((sum, tx) => sum + parseFloat(tx.amount), 0)
+    const data = mockDB.where(TABLE, 'project_id', projectId).filter(tx => tx.type === 'funding')
+    const total = data.reduce((sum, tx) => sum + Number(tx.amount), 0)
     return parseFloat(total.toFixed(8))
 }
