@@ -107,7 +107,7 @@ export default function ProfilePage() {
                                 {copied ? <><CheckCircle size={14} /> Copied!</> : <><Copy size={14} /> Copy Address</>}
                             </button>
                             <a
-                                href={`https://hashkeychain-testnet-explorer.alt.technology/address/${address}`}
+                                href={`https://testnet-explorer.hsk.xyz/address/${address}`}
                                 target="_blank" rel="noreferrer"
                                 style={{
                                     flex: 1, padding: '10px', borderRadius: '10px', cursor: 'pointer',

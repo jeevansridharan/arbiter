@@ -23,8 +23,8 @@ export default function ProgressBar({ current, target }) {
                 />
             </div>
             <div className="flex justify-between mt-2 text-xs text-slate-500">
-                <span>{current.toFixed(8)} BCH raised</span>
-                <span>Goal: {target.toFixed(8)} BCH</span>
+                <span>{current.toFixed(8)} HSK raised</span>
+                <span>Goal: {target.toFixed(8)} HSK</span>
             </div>
         </div>
     )

@@ -16,7 +16,7 @@ const TYPE_META = {
 
 function TxRow({ tx }) {
     const meta = TYPE_META[tx.type] ?? TYPE_META.funding
-    const explorerUrl = `https://hashkeychain-testnet-explorer.alt.technology/tx/${tx.tx_hash}`
+    const explorerUrl = `https://testnet-explorer.hsk.xyz/tx/${tx.tx_hash}`
     const date = new Date(tx.created_at).toLocaleString()
 
     return (

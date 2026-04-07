@@ -11,21 +11,23 @@ import { Calendar, Target, TrendingUp, Wallet, ArrowRight, Trash2, Shield } from
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 /**
- * Formats a BCH numeric value to 8 decimal places.
- * e.g. 0.005 → "0.00500000 BCH"
+ * Formats a HSK numeric value to 8 decimal places.
+ * e.g. 0.005 → "0.00500000 HSK"
  */
-function formatBCH(value) {
-    return `${parseFloat(value || 0).toFixed(8)} BCH`
+function formatHSK(value) {
+    return `${parseFloat(value || 0).toFixed(8)} HSK`
 }
 
 /**
- * Shortens a BCH cashaddr for display.
- * e.g. "bchtest:qp...abcd"
+ * Shortens an address for display.
  */
 function shortWallet(addr) {
-    if (!addr || !addr.includes(':')) return addr
-    const [prefix, body] = addr.split(':')
-    return `${prefix}:${body.slice(0, 4)}...${body.slice(-4)}`
+    if (!addr) return addr
+    if (addr.includes(':')) {
+        const [prefix, body] = addr.split(':')
+        return `${prefix}:${body.slice(0, 4)}...${body.slice(-4)}`
+    }
+    return `${addr.slice(0, 6)}...${addr.slice(-4)}`
 }
 
 /**
@@ -45,7 +47,7 @@ function formatDate(isoString) {
  */
 function cleanDescription(text) {
     if (!text) return ''
-    return text.replace(/\[On-Chain Address: bchtest:[^\]]+\]/g, '').trim()
+    return text.replace(/\[On-Chain Address: [^\]]+\]/g, '').trim()
 }
 
 /**
@@ -85,7 +87,7 @@ export default function ProjectCard({ project, onView, onDelete }) {
     // Fallback: If contract_address is null, try to extract it from the description
     let displayAddress = contract_address
     if (!displayAddress && description && description.includes('[On-Chain Address: ')) {
-        const match = description.match(/\[On-Chain Address: (bchtest:[^\]]+)\]/)
+        const match = description.match(/\[On-Chain Address: ([^\]]+)\]/)
         if (match) displayAddress = match[1]
     }
 
@@ -156,10 +158,10 @@ export default function ProjectCard({ project, onView, onDelete }) {
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '6px' }}>
                     <span style={{ fontSize: '0.72rem', color: '#10b981', fontWeight: 700 }}>
-                        {formatBCH(raised_amount)} raised
+                        {formatHSK(raised_amount)} raised
                     </span>
                     <span style={{ fontSize: '0.72rem', color: '#475569' }}>
-                        Goal: {formatBCH(goal_amount)}
+                        Goal: {formatHSK(goal_amount)}
                     </span>
                 </div>
             </div>
@@ -173,7 +175,7 @@ export default function ProjectCard({ project, onView, onDelete }) {
                 <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
                     <Target size={13} color="#10b981" />
                     <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>
-                        {formatBCH(goal_amount)}
+                        {formatHSK(goal_amount)}
                     </span>
                 </div>
 
@@ -181,7 +183,7 @@ export default function ProjectCard({ project, onView, onDelete }) {
                 <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
                     <TrendingUp size={13} color="#34d399" />
                     <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>
-                        {formatBCH(raised_amount)} raised
+                        {formatHSK(raised_amount)} raised
                     </span>
                 </div>
 
