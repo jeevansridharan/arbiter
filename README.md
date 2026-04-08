@@ -1,150 +1,249 @@
-# Milestara — Week 3: CashScript + CashTokens Governance
+<div align="center">
 
-## 📦 What Was Added (Week 3)
+# ⚡ Arbit
 
-| File | Purpose |
-|------|---------|
-| `src/contracts/MilestoneLock.cash` | CashScript smart contract source |
-| `src/services/milestoneContract.js` | All Week 3 logic: mint, vote, release |
-| `src/components/GovernancePanel.jsx` | New governance UI panel |
-| `src/components/Dashboard.jsx` | Updated to include GovernancePanel |
-| `src/components/WalletPanel.jsx` | Updated to expose wallet to parent |
+### *AI-powered PayFi protocol for autonomous payouts*
 
----
+> **"Stop waiting for approval. Let the AI decide. Let the chain pay."**
 
-## 🔄 Full User Flow
+[![Built for BCH Hackathon](https://img.shields.io/badge/🏆_BCH_Hackathon-PayFi_%2B_AI-blueviolet?style=for-the-badge)](https://github.com)
+[![HashKey Chain](https://img.shields.io/badge/HashKey_Chain-EVM-00c9ff?style=for-the-badge&logo=ethereum)](https://hsk.xyz)
+[![Groq AI](https://img.shields.io/badge/Groq-LLM_Powered-ff6b6b?style=for-the-badge)](https://groq.com)
+[![React](https://img.shields.io/badge/React-Frontend-61dafb?style=for-the-badge&logo=react)](https://reactjs.org)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow?style=for-the-badge)](./LICENSE)
 
-```
-1. Connect BCH Wallet (Week 2 panel)
-        ↓
-2. Lock BCH in Governance Panel (simulates contract funding)
-        ↓ mints CashTokens (GOV tokens)
-3. Use GOV tokens to vote YES/NO on milestones
-        ↓ each token = 1 vote
-4. If >50% YES → milestone approved → Release button appears
-        ↓ calls wallet.send() on Chipnet
-5. BCH sent from your wallet to the project team address ✅
-```
+</div>
 
 ---
 
-## 🛠️ Install Dependencies
+## 🚀 Introduction
+
+**Arbit** is a decentralized, AI-driven funding protocol that eliminates human governance from the payout process. Built on **HashKey Chain** (EVM-compatible) and powered by **Groq's LLM**, Arbit evaluates submitted work autonomously and releases payments through smart contracts — no middlemen, no delays, no bias.
+
+Whether you're a freelancer, an open-source contributor, or a DAO participant, Arbit makes sure *your work speaks for itself* — and the AI + blockchain combination ensures you get paid for it, instantly.
+
+> 🏗️ **Built for the BCH Hackathon** · Tracks: **PayFi + AI**
+
+---
+
+## 🧠 How It Works
+
+Arbit follows a clean, 5-step autonomous pipeline:
+
+```
+📝 Submit Work  →  🤖 AI Evaluation (Groq)  →  📊 Score Generated
+       →  📜 Smart Contract Triggered  →  💸 Auto Payout Released
+```
+
+| Step | Action | Technology |
+|------|--------|------------|
+| 1️⃣ **Submit** | User submits work/milestone | React Frontend |
+| 2️⃣ **Evaluate** | Groq LLM scores the submission | Groq API + Node.js |
+| 3️⃣ **Score** | AI generates a quality score (0–100) | LLM (llama-3.3-70b) |
+| 4️⃣ **Execute** | Smart contract reads score and conditions | Solidity on HashKey Chain |
+| 5️⃣ **Payout** | Funds released automatically on-chain | EVM Transaction |
+
+No human approvals. No committees. No waiting.
+
+---
+
+## ⚙️ Tech Stack
+
+| Layer | Technology | Purpose |
+|-------|-----------|---------|
+| 🎨 **Frontend** | React.js | User interface & wallet integration |
+| 🔧 **Backend** | Node.js + Express | API gateway & AI orchestration |
+| 🤖 **AI Engine** | Groq API (LLaMA 3.3 70B) | Work evaluation & scoring |
+| ⛓️ **Blockchain** | HashKey Chain (EVM) | On-chain execution |
+| 📜 **Smart Contracts** | Solidity | Autonomous payout logic |
+| 🔑 **Wallet** | EVM-compatible (MetaMask, etc.) | User authentication & signing |
+
+---
+
+## 🔥 Features
+
+- 🤖 **AI-Powered Evaluation** — Submissions are scored by a state-of-the-art LLM (Groq / LLaMA 3.3 70B), removing human subjectivity
+- 💸 **Autonomous Payouts** — Smart contracts release funds on-chain based on AI scores, zero manual intervention
+- 🔒 **Trustless by Design** — No central authority; logic is enforced by code and AI
+- 🪪 **Wallet Integration** — Seamless Web3 wallet connect for users on HashKey Chain
+- 🏁 **Milestone-Based Funding** — Break projects into milestones; each evaluated and paid independently
+- ⚡ **Fast Settlement** — On-chain transactions on HashKey Chain with near-instant finality
+- 📊 **Score Transparency** — AI reasoning and scores are visible to all participants
+
+---
+
+## 🏗️ Architecture
+
+```
+┌─────────────────────────────────────────────────────┐
+│                    USER INTERFACE                    │
+│               (React + Wallet Connect)               │
+└────────────────────────┬────────────────────────────┘
+                         │  HTTP / Web3
+                         ▼
+┌─────────────────────────────────────────────────────┐
+│                  ARBIT BACKEND API                   │
+│               (Node.js + Express)                    │
+│                                                      │
+│  ┌─────────────────┐    ┌──────────────────────┐    │
+│  │   Groq AI Layer │    │  Smart Contract Layer│    │
+│  │  (LLM Scoring)  │───▶│  (HashKey Chain EVM) │    │
+│  └─────────────────┘    └──────────────────────┘    │
+└─────────────────────────────────────────────────────┘
+                         │
+                         ▼
+┌─────────────────────────────────────────────────────┐
+│                  HASHKEY CHAIN                       │
+│          (Testnet: testnet.hsk.xyz)                  │
+│                                                      │
+│      Arbit Smart Contract (Solidity)                 │
+│      • Holds funds in escrow                         │
+│      • Reads AI score via backend oracle             │
+│      • Releases payout autonomously                  │
+└─────────────────────────────────────────────────────┘
+```
+
+---
+
+## 🧪 How to Run Locally
+
+### Prerequisites
+
+- Node.js `v18+`
+- npm or yarn
+- MetaMask (or any EVM wallet)
+- A Groq API Key → [console.groq.com](https://console.groq.com)
+- HashKey Chain Testnet configured in your wallet
+
+### 1. Clone the Repository
 
 ```bash
-npm install @cashscript/utils cashscript
+git clone https://github.com/your-username/arbit.git
+cd arbit
 ```
 
----
-
-## 🚀 Run Locally
+### 2. Configure Environment Variables
 
 ```bash
+cp .env.example .env
+```
+
+Edit `.env` and fill in your values:
+
+```env
+# Groq AI
+GROQ_API_KEY=your_groq_api_key_here
+
+# HashKey Chain
+RPC_URL=https://testnet.hsk.xyz
+CHAIN_ID=177
+
+# Smart Contract
+CONTRACT_ADDRESS=your_deployed_contract_address
+
+# Backend
+PORT=5000
+```
+
+### 3. Install Dependencies
+
+```bash
+# Backend
+cd backend
+npm install
+
+# Frontend
+cd ../frontend
+npm install
+```
+
+### 4. Start the App
+
+```bash
+# Start Backend (from /backend)
+npm run dev
+
+# Start Frontend (from /frontend)
 npm run dev
 ```
 
-Open: http://localhost:5173
+### 5. Connect Your Wallet
+
+Configure MetaMask for **HashKey Chain Testnet**:
+
+| Field | Value |
+|-------|-------|
+| Network Name | HashKey Chain Testnet |
+| RPC URL | `https://testnet.hsk.xyz` |
+| Chain ID | `177` |
+| Currency Symbol | `HSK` |
+| Block Explorer | `https://testnet-explorer.hsk.xyz` |
 
 ---
 
-## 📜 CashScript Contract Explained
+## 📸 Screenshots
 
-**File:** `src/contracts/MilestoneLock.cash`
+> 🚧 Screenshots coming soon — UI is live and AI evaluation is functional!
 
-```cashscript
-contract MilestoneLock(pubkey ownerPk, pubkey funderPk) {
-    function release(sig ownerSig) {
-        require(checkSig(ownerSig, ownerPk));
-    }
-    function refund(sig funderSig) {
-        require(checkSig(funderSig, funderPk));
-    }
-}
-```
-
-**What it means:**
-- `constructor params` = baked into the contract at deploy time
-- `release()` = only the project OWNER (who has `ownerPk`) can sign and unlock
-- `refund()` = the original FUNDER can always get their money back
-- The BCH sitting in this contract UTXO can only be spent via one of these two functions
-- The 50% governance threshold is enforced in `milestoneContract.js` — only calls `release()` after approval
+| Feature | Preview |
+|---------|---------|
+| 🏠 Dashboard | *(coming soon)* |
+| 📝 Submit Work | *(coming soon)* |
+| 🤖 AI Score Result | *(coming soon)* |
+| 💸 Payout Triggered | *(coming soon)* |
 
 ---
 
-## 🪙 CashTokens Explained
+## 🛣️ Roadmap
 
-CashTokens are **native tokens** on BCH — baked into the protocol (since CHIP-2022-02).
+### ✅ Phase 1 — Foundation *(Current)*
+- [x] React UI scaffolded
+- [x] Groq AI evaluation endpoint live
+- [x] AI scoring pipeline running (0–100 scores)
+- [x] Wallet integration (HashKey Chain Testnet)
+- [ ] Smart contract integration (in progress)
 
-**Types:**
-- **Fungible tokens (FT)** — like our GOV tokens — you can split and merge them
-- **Non-fungible tokens (NFT)** — unique (not used here)
+### 🔄 Phase 2 — Core Protocol
+- [ ] Full on-chain payout via smart contract
+- [ ] Milestone-based escrow logic
+- [ ] Live deployment on HashKey Chain Mainnet
+- [ ] Score audit trail on-chain
 
-**How we mint:**
-```js
-await wallet.send([
-    new TokenSendRequest({
-        cashaddr: wallet.cashaddr,
-        amount: 100,  // mint 100 tokens
-    })
-])
-```
-The first time you send with `TokenSendRequest` without a category, it creates a **genesis** output — a brand new token type. The Transaction ID becomes the **Token Category ID** (like a contract address in Ethereum).
-
----
-
-## 🏗️ Deploy Contract to Chipnet (Production Steps)
-
-For a real deployment (beyond the hackathon MVP):
-
-### Step 1 — Install cashc compiler CLI
-```bash
-npm install -g cashc
-```
-
-### Step 2 — Compile the contract
-```bash
-cashc src/contracts/MilestoneLock.cash --output src/contracts/MilestoneLock.json
-```
-This creates a JSON artifact with the bytecode.
-
-### Step 3 — Deploy using a Node script
-```js
-import { Contract, ElectrumNetworkProvider } from 'cashscript'
-import artifact from './src/contracts/MilestoneLock.json' assert { type: 'json' }
-
-const provider = new ElectrumNetworkProvider('chipnet')
-const contract = new Contract(artifact, [ownerPubKey, funderPubKey], { provider })
-
-console.log('Contract address:', contract.address)
-// Fund this address with testnet BCH from the faucet
-```
-
-### Step 4 — Call release() from the frontend
-```js
-const contractInstance = new Contract(artifact, [ownerPk, funderPk], { provider })
-const tx = await contractInstance.functions
-    .release(new SignatureTemplate(ownerKeypair))
-    .to(ownerAddress, contractBalance - 1000n)  // keep 1000 sat for fee
-    .send()
-```
+### 🚀 Phase 3 — Scale & Ecosystem
+- [ ] DAO integration for fund pooling
+- [ ] Multi-chain support
+- [ ] SDK for third-party dApps
+- [ ] Reputation system for contributors
 
 ---
 
-## 🧪 How to Test Locally (MVP Demo Mode)
+## 🤝 Contributing
 
-1. Open http://localhost:5173
-2. Create a project with 2–3 milestones
-3. Click **Connect Wallet** (auto-generates a Chipnet wallet)
-4. Go to [tbch.googol.cash](https://tbch.googol.cash), paste your wallet address, get free tBCH
-5. Wait 1–2 min, click 🔄 refresh, see your balance
-6. In **Governance Panel**: enter 0.001 BCH → click **Lock & Mint**
-7. You receive 100 GOV tokens
-8. Click **YES** buttons next to milestones to vote (each click uses tokens)
-9. Once >50% YES → click **Release Funds** → real Chipnet tx!
+Contributions are welcome! If you'd like to improve Arbit:
+
+1. Fork the repository
+2. Create a feature branch: `git checkout -b feature/your-feature`
+3. Commit your changes: `git commit -m 'feat: add your feature'`
+4. Push to the branch: `git push origin feature/your-feature`
+5. Open a Pull Request
+
+Please follow conventional commits and keep PRs focused.
 
 ---
 
-## 🔮 Week 4 Ideas (Beyond MVP)
-- On-chain vote counting via CashTokens burns
-- Multi-sig release with CashScript `checkMultiSig`
-- NFT milestone receipts for funders
-- Backend indexer to track all project contracts
+## 📜 License
+
+This project is licensed under the **MIT License**.
+See [LICENSE](./LICENSE) for full details.
+
+---
+
+<div align="center">
+
+**Built with ❤️ for the BCH Hackathon**
+
+*PayFi + AI · HashKey Chain · Groq · Autonomous Payouts*
+
+⭐ **Star this repo if you believe AI should replace governance** ⭐
+
+</div>
