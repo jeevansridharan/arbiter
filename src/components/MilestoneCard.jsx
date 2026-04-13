@@ -1,23 +1,23 @@
-import React from 'react'
-import { Brain, CheckCircle, XCircle, Clock } from 'lucide-react'
+/**
+ * MilestoneCard.jsx — Per-milestone AI evaluation (Arbit)
+ *
+ * Each card exposes:
+ *   • Proof textarea  — what the creator submits
+ *   • "Evaluate with AI" button
+ *   • Score bar (animated)
+ *   • Status badge: Pending / Approved / Rejected
+ *
+ * Props:
+ *   milestone  — { id, title, description?, amount?, score, status, proof }
+ *   index      — display number
+ *   onEvaluate — async (milestoneId, proof) => void  (provided by Dashboard)
+ */
+import React, { useState } from 'react'
+import { Brain, CheckCircle, XCircle, Clock, Loader2, Send, ChevronDown, ChevronUp } from 'lucide-react'
 
-// ── AI Status badge helper ────────────────────────────────────────────────────
-function AIStatusBadge({ score, isScored }) {
-    if (!isScored) {
-        return (
-            <span style={{
-                display: 'inline-flex', alignItems: 'center', gap: '5px',
-                fontSize: '0.68rem', fontWeight: 700, padding: '3px 10px',
-                borderRadius: '999px', whiteSpace: 'nowrap',
-                background: 'rgba(234,179,8,0.12)',
-                border: '1px solid rgba(234,179,8,0.3)',
-                color: '#fbbf24',
-            }}>
-                <Clock size={11} /> Pending AI Evaluation
-            </span>
-        )
-    }
-    if (score >= 60) {
+// ── Status badge ─────────────────────────────────────────────────────────────
+function StatusBadge({ status }) {
+    if (status === 'approved') {
         return (
             <span style={{
                 display: 'inline-flex', alignItems: 'center', gap: '5px',
@@ -31,34 +31,49 @@ function AIStatusBadge({ score, isScored }) {
             </span>
         )
     }
+    if (status === 'rejected') {
+        return (
+            <span style={{
+                display: 'inline-flex', alignItems: 'center', gap: '5px',
+                fontSize: '0.68rem', fontWeight: 700, padding: '3px 10px',
+                borderRadius: '999px', whiteSpace: 'nowrap',
+                background: 'rgba(239,68,68,0.1)',
+                border: '1px solid rgba(239,68,68,0.3)',
+                color: '#f87171',
+            }}>
+                <XCircle size={11} /> AI Rejected
+            </span>
+        )
+    }
     return (
         <span style={{
             display: 'inline-flex', alignItems: 'center', gap: '5px',
             fontSize: '0.68rem', fontWeight: 700, padding: '3px 10px',
             borderRadius: '999px', whiteSpace: 'nowrap',
-            background: 'rgba(239,68,68,0.1)',
-            border: '1px solid rgba(239,68,68,0.3)',
-            color: '#f87171',
+            background: 'rgba(234,179,8,0.12)',
+            border: '1px solid rgba(234,179,8,0.3)',
+            color: '#fbbf24',
         }}>
-            <XCircle size={11} /> AI Rejected
+            <Clock size={11} /> Pending
         </span>
     )
 }
 
 // ── Score bar ─────────────────────────────────────────────────────────────────
 function ScoreBar({ score }) {
-    const color = score >= 75 ? '#10b981' : score >= 50 ? '#f59e0b' : '#f43f5e'
+    const color = score >= 80 ? '#10b981' : score >= 50 ? '#f59e0b' : '#f43f5e'
     return (
-        <div style={{ marginBottom: '16px' }}>
+        <div style={{ margin: '14px 0 4px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
-                <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 600 }}>AI SCORE</span>
+                <span style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em' }}>AI Score</span>
                 <span style={{ fontSize: '0.85rem', fontWeight: 800, color }}>{score} / 100</span>
             </div>
             <div style={{ height: '6px', background: 'rgba(255,255,255,0.06)', borderRadius: '999px', overflow: 'hidden' }}>
                 <div style={{
                     height: '100%', borderRadius: '999px', width: `${score}%`,
                     background: `linear-gradient(90deg, ${color}, ${color}cc)`,
-                    transition: 'width 0.6s cubic-bezier(0.4,0,0.2,1)',
+                    transition: 'width 0.8s cubic-bezier(0.4,0,0.2,1)',
+                    boxShadow: `0 0 10px ${color}80`,
                 }} />
             </div>
         </div>
@@ -66,81 +81,224 @@ function ScoreBar({ score }) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-export default function MilestoneCard({ milestone, index }) {
-    const { title, approved, score } = milestone
+export default function MilestoneCard({ milestone, index, onEvaluate }) {
+    const { id, title, description, score, status, amount } = milestone
 
-    // Resolve score and approval state
-    const aiScore   = typeof score === 'number' ? score : (approved === true ? 80 : 0)
-    const isScored  = typeof score === 'number' || approved === true
-    const isApproved = approved === true || (isScored && aiScore >= 60)
+    // Local state for proof text + loading + error + expand toggle
+    const [proof, setProof]         = useState(milestone.proof ?? '')
+    const [evaluating, setEvaluating] = useState(false)
+    const [evalError, setEvalError]   = useState('')
+    const [expanded, setExpanded]     = useState(status === 'pending')
+
+    const isApproved = status === 'approved'
+    const isRejected = status === 'rejected'
+    const isScored   = typeof score === 'number'
+
+    // Border glow per status
+    const borderColor = isApproved
+        ? 'rgba(16,185,129,0.35)'
+        : isRejected
+            ? 'rgba(239,68,68,0.25)'
+            : 'rgba(255,255,255,0.06)'
+
+    const handleEvaluate = async () => {
+        if (!proof.trim()) {
+            setEvalError('Please describe your proof before evaluating.')
+            return
+        }
+        setEvaluating(true)
+        setEvalError('')
+        try {
+            await onEvaluate(id, proof)
+        } catch (e) {
+            setEvalError(e.message || 'Evaluation failed. Is the backend running?')
+        } finally {
+            setEvaluating(false)
+        }
+    }
 
     return (
-        <div className={`milestone-card p-5 ${isApproved ? 'milestone-approved' : ''}`}>
-            {/* Header row */}
-            <div className="flex items-start justify-between gap-3 mb-4">
-                <div className="flex items-start gap-3 flex-1">
+        <div style={{
+            background: isApproved
+                ? 'rgba(16,185,129,0.04)'
+                : isRejected
+                    ? 'rgba(239,68,68,0.03)'
+                    : 'rgba(15,17,35,0.7)',
+            border: `1px solid ${borderColor}`,
+            borderRadius: '16px',
+            padding: '20px 22px',
+            transition: 'border-color 0.3s, background 0.3s',
+        }}>
+
+            {/* ── Header row ──────────────────────────────────────────────── */}
+            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '10px' }}>
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', flex: 1 }}>
                     {/* Index badge */}
-                    <div
-                        className="w-8 h-8 rounded-lg flex items-center justify-center text-sm font-bold flex-shrink-0 mt-0.5"
-                        style={{
-                            background: isApproved
-                                ? 'rgba(16,185,129,0.2)'
-                                : 'rgba(52,211,153,0.15)',
-                            color: isApproved ? '#10b981' : '#34d399',
-                        }}
-                    >
+                    <div style={{
+                        width: '32px', height: '32px', borderRadius: '9px',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        fontSize: '0.8rem', fontWeight: 800, flexShrink: 0, marginTop: '2px',
+                        background: isApproved ? 'rgba(16,185,129,0.2)' : 'rgba(255,255,255,0.06)',
+                        color: isApproved ? '#10b981' : '#64748b',
+                    }}>
                         {isApproved ? '✓' : index + 1}
                     </div>
-                    {/* Title */}
-                    <div>
-                        <h3 className="text-white font-semibold text-sm">{title}</h3>
-                        <p className="text-slate-500 text-xs mt-0.5">
-                            {isScored
-                                ? `AI evaluated — score ${aiScore}/100`
-                                : 'Awaiting AI evaluation'}
+
+                    {/* Title + subtitle */}
+                    <div style={{ flex: 1 }}>
+                        <h3 style={{ color: '#f1f5f9', fontWeight: 700, fontSize: '0.95rem', marginBottom: '2px' }}>
+                            {title}
+                        </h3>
+                        <p style={{ color: '#475569', fontSize: '0.75rem' }}>
+                            {description || (isScored
+                                ? `AI evaluated — ${score}/100`
+                                : 'Submit proof to trigger AI evaluation')}
                         </p>
                     </div>
                 </div>
-                {/* AI Status badge */}
-                <AIStatusBadge score={aiScore} isScored={isScored} />
+
+                {/* Right: badge + toggle */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+                    {amount != null && (
+                        <span style={{ fontSize: '0.72rem', color: '#34d399', fontWeight: 700 }}>
+                            {parseFloat(amount).toFixed(2)} HSK
+                        </span>
+                    )}
+                    <StatusBadge status={status ?? 'pending'} />
+                    <button
+                        onClick={() => setExpanded(x => !x)}
+                        style={{
+                            background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)',
+                            borderRadius: '8px', color: '#64748b', cursor: 'pointer',
+                            display: 'flex', alignItems: 'center', padding: '4px 6px',
+                            transition: 'all 0.2s',
+                        }}
+                    >
+                        {expanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                    </button>
+                </div>
             </div>
 
-            {/* Score bar (only if scored) */}
-            {isScored && <ScoreBar score={aiScore} />}
+            {/* ── Score bar (if scored) ────────────────────────────────────── */}
+            {isScored && <ScoreBar score={score} />}
 
-            {/* AI evaluation note */}
-            <div style={{
-                display: 'flex', alignItems: 'center', gap: '8px',
-                padding: '10px 14px', borderRadius: '10px',
-                background: isApproved
-                    ? 'rgba(16,185,129,0.07)'
-                    : isScored
-                        ? 'rgba(239,68,68,0.06)'
-                        : 'rgba(234,179,8,0.06)',
-                border: isApproved
-                    ? '1px solid rgba(16,185,129,0.2)'
-                    : isScored
-                        ? '1px solid rgba(239,68,68,0.2)'
-                        : '1px solid rgba(234,179,8,0.2)',
-            }}>
-                <Brain size={14} color={isApproved ? '#10b981' : isScored ? '#f87171' : '#fbbf24'} />
-                <span style={{
-                    fontSize: '0.75rem', fontWeight: 600,
-                    color: isApproved ? '#34d399' : isScored ? '#f87171' : '#fbbf24',
-                }}>
-                    {isApproved
-                        ? 'AI Approved — funds will be released automatically'
-                        : isScored
-                            ? 'AI Rejected — score below threshold'
-                            : 'Pending AI Evaluation — submit proof to trigger scoring'}
-                </span>
-            </div>
+            {/* ── Expandable panel ────────────────────────────────────────── */}
+            {expanded && (
+                <div style={{ marginTop: '16px', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '16px' }}>
 
-            {isApproved && (
-                <p className="text-[10px] text-emerald-500/60 mt-3 text-center font-semibold tracking-tight">
-                    🤖 SECURED BY AI ORACLE · HASHKEY CHAIN
-                </p>
+                    {/* Proof textarea */}
+                    <label style={{ fontSize: '0.72rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.07em', display: 'block', marginBottom: '8px' }}>
+                        Milestone Proof
+                    </label>
+                    <textarea
+                        value={proof}
+                        onChange={e => { setProof(e.target.value); setEvalError('') }}
+                        placeholder={`Describe what you achieved for "${title}"…\nEx: Deployed the smart contract at 0x… Tested with 500 transactions…`}
+                        disabled={isApproved || evaluating}
+                        rows={4}
+                        style={{
+                            width: '100%',
+                            boxSizing: 'border-box',
+                            background: 'rgba(5,7,20,0.5)',
+                            border: `1px solid ${evalError ? 'rgba(239,68,68,0.4)' : 'rgba(255,255,255,0.07)'}`,
+                            borderRadius: '10px',
+                            padding: '12px 14px',
+                            color: '#f1f5f9',
+                            fontSize: '0.85rem',
+                            lineHeight: '1.65',
+                            resize: 'vertical',
+                            outline: 'none',
+                            fontFamily: 'inherit',
+                            transition: 'border-color 0.2s',
+                            opacity: isApproved ? 0.6 : 1,
+                        }}
+                        onFocus={e => { if (!isApproved) e.currentTarget.style.borderColor = 'rgba(167,139,250,0.4)' }}
+                        onBlur={e => e.currentTarget.style.borderColor = evalError ? 'rgba(239,68,68,0.4)' : 'rgba(255,255,255,0.07)'}
+                    />
+
+                    {evalError && (
+                        <p style={{ color: '#f87171', fontSize: '0.75rem', marginTop: '6px', fontWeight: 500 }}>
+                            ⚠ {evalError}
+                        </p>
+                    )}
+
+                    {/* Evaluate button */}
+                    {!isApproved && (
+                        <button
+                            onClick={handleEvaluate}
+                            disabled={evaluating || !proof.trim()}
+                            style={{
+                                marginTop: '12px',
+                                display: 'flex', alignItems: 'center', gap: '8px',
+                                padding: '10px 20px', borderRadius: '10px',
+                                cursor: evaluating || !proof.trim() ? 'not-allowed' : 'pointer',
+                                background: evaluating
+                                    ? 'rgba(167,139,250,0.08)'
+                                    : !proof.trim()
+                                        ? 'rgba(255,255,255,0.04)'
+                                        : 'linear-gradient(135deg,#a78bfa,#7c3aed)',
+                                border: evaluating || !proof.trim()
+                                    ? '1px solid rgba(167,139,250,0.15)'
+                                    : 'none',
+                                color: evaluating || !proof.trim() ? '#a78bfa' : '#fff',
+                                fontSize: '0.85rem', fontWeight: 700,
+                                transition: 'all 0.2s',
+                                boxShadow: !evaluating && proof.trim() ? '0 0 20px rgba(167,139,250,0.3)' : 'none',
+                            }}
+                            onMouseEnter={e => {
+                                if (!evaluating && proof.trim()) {
+                                    e.currentTarget.style.boxShadow = '0 4px 20px rgba(167,139,250,0.5)'
+                                    e.currentTarget.style.transform = 'translateY(-1px)'
+                                }
+                            }}
+                            onMouseLeave={e => {
+                                e.currentTarget.style.boxShadow = !evaluating && proof.trim() ? '0 0 20px rgba(167,139,250,0.3)' : 'none'
+                                e.currentTarget.style.transform = 'translateY(0)'
+                            }}
+                        >
+                            {evaluating ? (
+                                <>
+                                    <Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} />
+                                    Evaluating…
+                                </>
+                            ) : (
+                                <>
+                                    <Brain size={16} />
+                                    Evaluate with AI
+                                    <Send size={14} />
+                                </>
+                            )}
+                        </button>
+                    )}
+
+                    {/* AI result note */}
+                    {isScored && (
+                        <div style={{
+                            marginTop: '14px',
+                            display: 'flex', alignItems: 'center', gap: '8px',
+                            padding: '10px 14px', borderRadius: '10px',
+                            background: isApproved ? 'rgba(16,185,129,0.07)' : 'rgba(239,68,68,0.06)',
+                            border: isApproved ? '1px solid rgba(16,185,129,0.2)' : '1px solid rgba(239,68,68,0.2)',
+                        }}>
+                            <Brain size={13} color={isApproved ? '#10b981' : '#f87171'} />
+                            <span style={{ fontSize: '0.75rem', fontWeight: 600, color: isApproved ? '#34d399' : '#f87171' }}>
+                                {isApproved
+                                    ? `Score ${score}/100 — AI Approved. Funds will be released automatically.`
+                                    : `Score ${score}/100 — AI Rejected. Score must be ≥ 80 to approve.`}
+                            </span>
+                        </div>
+                    )}
+
+                    {isApproved && (
+                        <p style={{ fontSize: '0.65rem', color: '#10b981', opacity: 0.5, textAlign: 'center', marginTop: '10px', fontWeight: 700, letterSpacing: '0.08em' }}>
+                            🤖 SECURED BY AI ORACLE · HASHKEY CHAIN
+                        </p>
+                    )}
+                </div>
             )}
+
+            {/* Spin keyframe */}
+            <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
         </div>
     )
 }

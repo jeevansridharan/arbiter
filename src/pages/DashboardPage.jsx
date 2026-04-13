@@ -12,7 +12,6 @@ import {
     RefreshCw, Brain, Star, Award,
 } from 'lucide-react'
 import { fetchProjects } from '../lib/db/projects'
-import AIEvaluationPanel from '../components/AIEvaluationPanel'
 
 // ── Quick action card ─────────────────────────────────────────────────────────
 function QuickAction({ to, Icon, title, description, color, onClick }) {
@@ -163,10 +162,7 @@ export default function DashboardPage() {
                 <StatCard label="Average AI Score"   value={stats.avgScore ? `${stats.avgScore}` : '—'} unit="/ 100" color="#06b6d4" Icon={Star} />
             </div>
 
-            {/* ── AI Evaluation Panel (New) ────────────────────────────────── */}
-            <div style={{ marginBottom: '28px' }}>
-                <AIEvaluationPanel />
-            </div>
+
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: '16px', marginBottom: '28px' }}>
                 <StatCard label="Total Funded"    value={stats.hskRaised}  unit="HSK"      color="#34d399" Icon={TrendingUp} />
                 <StatCard label="Rewards Released" value={stats.rewards}   unit="RELEASED" color="#f59e0b" Icon={Award} />
