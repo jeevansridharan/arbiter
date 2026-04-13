@@ -161,6 +161,8 @@ export default function DashboardPage() {
                 <StatCard label="AI Evaluations"     value={stats.evaluations} unit="SCORED" color="#a78bfa" Icon={Brain} />
                 <StatCard label="Average AI Score"   value={stats.avgScore ? `${stats.avgScore}` : '—'} unit="/ 100" color="#06b6d4" Icon={Star} />
             </div>
+
+
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: '16px', marginBottom: '28px' }}>
                 <StatCard label="Total Funded"    value={stats.hskRaised}  unit="HSK"      color="#34d399" Icon={TrendingUp} />
                 <StatCard label="Rewards Released" value={stats.rewards}   unit="RELEASED" color="#f59e0b" Icon={Award} />

@@ -160,7 +160,7 @@ export default function ProjectsPage() {
     const handleTransaction = async (amount, txHash, type = 'funding', walletAddress) => {
         if (!activeProject) return
         const finalWallet = walletAddress || PLACEHOLDER_WALLET
-        console.log(`[ProjectsPage] handleTransaction: ${type} of ${amount} BCH (${txHash}) by ${finalWallet}`)
+        console.log(`[ProjectsPage] handleTransaction: ${type} of ${amount} HSK (${txHash}) by ${finalWallet}`)
 
         // 1. Record in transactions table
         if (txHash) {

@@ -72,7 +72,7 @@ export default function ProjectForm({ onProjectCreate, walletAddress }) {
             title: title.trim(),
             description: description.trim(),
             goal_amount: Number(fundingTarget),       // ← DB column name
-            owner_wallet: walletAddress ?? 'bchtest:unknown',  // ← DB column name
+            owner_wallet: walletAddress ?? '0xAddressUnknown',  // ← DB column name
             milestones: milestones.map((m, i) => ({
                 id: i,
                 title: m,
@@ -106,7 +106,7 @@ export default function ProjectForm({ onProjectCreate, walletAddress }) {
                     Create New Project
                 </div>
                 <h1 className="text-3xl font-bold text-white mb-2">Launch Your Project</h1>
-                <p className="text-slate-400">Define your project, set a funding target, and outline milestones for community governance on Chipnet.</p>
+                <p className="text-slate-400">Define your project, set a funding target, and outline milestones for community governance on HashKey Chain.</p>
             </div>
 
             <form onSubmit={handleSubmit} className="card-glass rounded-2xl p-8 space-y-6">
@@ -129,7 +129,7 @@ export default function ProjectForm({ onProjectCreate, walletAddress }) {
                         borderRadius: '12px', padding: '14px 18px',
                         color: '#34d399', fontSize: '0.85rem', fontWeight: 500,
                     }}>
-                        ✓ Project created and saved to Supabase!
+                        ✓ Project created successfully!
                     </div>
                 )}
 
@@ -143,7 +143,7 @@ export default function ProjectForm({ onProjectCreate, walletAddress }) {
                         type="text"
                         value={title}
                         onChange={(e) => setTitle(e.target.value)}
-                        placeholder="e.g. Decentralized AI on Bitcoin Cash"
+                        placeholder="e.g. Decentralized AI on HashKey Chain"
                         className="input-web3"
                     />
                     {errors.title && <p className="mt-1.5 text-xs text-rose-400">{errors.title}</p>}
@@ -168,7 +168,7 @@ export default function ProjectForm({ onProjectCreate, walletAddress }) {
                 {/* Funding Target */}
                 <div>
                     <label className="block text-sm font-semibold text-slate-300 mb-2">
-                        Funding Target (BCH)
+                        Funding Target (HSK)
                     </label>
                     <div className="relative">
                         <input
@@ -181,7 +181,7 @@ export default function ProjectForm({ onProjectCreate, walletAddress }) {
                             placeholder="0.0000"
                             className="input-web3 pr-16"
                         />
-                        <span className="absolute right-4 top-1/2 -translate-y-1/2 text-sm font-semibold" style={{ color: '#10b981' }}>BCH</span>
+                        <span className="absolute right-4 top-1/2 -translate-y-1/2 text-sm font-semibold" style={{ color: '#10b981' }}>HSK</span>
                     </div>
                     {errors.fundingTarget && <p className="mt-1.5 text-xs text-rose-400">{errors.fundingTarget}</p>}
                 </div>
@@ -249,7 +249,7 @@ export default function ProjectForm({ onProjectCreate, walletAddress }) {
                     className="w-full py-3.5 rounded-xl font-bold text-white gradient-btn-green text-base mt-2"
                     style={{ opacity: submitting ? 0.7 : 1, cursor: submitting ? 'not-allowed' : 'pointer' }}
                 >
-                    {submitting ? '⏳ Saving to Supabase…' : '🚀 Create Project'}
+                    {submitting ? '⏳ Processing…' : '🚀 Create Project'}
                 </button>
 
             </form>

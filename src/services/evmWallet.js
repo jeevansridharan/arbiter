@@ -6,8 +6,8 @@
 import { ethers } from 'ethers'
 
 export const HASHKEY_CHAIN_ID = '0x85' // 133 decimal — HashKey Chain Testnet
-export const HASHKEY_RPC      = 'https://hashkeychain-testnet.alt.technology'
-export const HASHKEY_EXPLORER = 'https://hashkeychain-testnet-explorer.alt.technology'
+export const HASHKEY_RPC      = 'https://testnet.hsk.xyz'
+export const HASHKEY_EXPLORER = 'https://testnet-explorer.hsk.xyz'
 
 const WALLET_STORAGE_KEY = 'arbit_evm_private_key'
 
@@ -46,8 +46,11 @@ export async function connectMetaMask() {
     try {
         await provider.send('wallet_switchEthereumChain', [{ chainId: HASHKEY_CHAIN_ID }])
     } catch (err) {
-        // Chain not added yet → add it
-        if (err.code === 4902) {
+        console.warn('[evmWallet] Switch network error:', err)
+        // Check for "4902" (chain not added) or if the message says to add it
+        const errorCode = err.code || err?.info?.error?.code || (err?.error?.code)
+        if (errorCode === 4902 || String(err).includes('wallet_addEthereumChain')) {
+            console.log('[evmWallet] Chain not found in MetaMask. Adding it…')
             await provider.send('wallet_addEthereumChain', [HASHKEY_NETWORK_PARAMS])
         } else {
             throw err
