@@ -11,6 +11,7 @@
     "server": "node server.js"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.110.2",
     "cors": "^2.8.6",
     "dotenv": "^17.4.1",
     "ethers": "^6.16.0",
