@@ -1,0 +1,132 @@
+import { ethers } from 'ethers';
+import { HASHKEY_RPC } from './evmWallet';
+
+const CONTRACT_ADDRESS = import.meta.env.VITE_CONTRACT_ADDRESS || '';
+
+export const ARBIT_CORE_ABI = [
+    // Core Write Functions
+    "function createProject(uint256 threshold) external payable returns (uint256 projectId)",
+    "function submitMilestoneProof(uint256 projectId, string calldata proof) external",
+    "function submitAIScore(uint256 projectId, uint256 score, bytes calldata signature) external",
+    "function releaseFunds(uint256 projectId) external",
+    "function refund(uint256 projectId) external",
+    
+    // Admin Functions
+    "function setOracle(address newOracle) external",
+
+    // View Functions
+    "function getProject(uint256 projectId) external view returns (tuple(address creator, uint256 funds, uint256 score, uint256 threshold, string proof, bool isScored, bool isReleased))",
+    "function isActive(uint256 projectId) external view returns (bool)",
+    
+    // Events
+    "event ProjectCreated(uint256 indexed projectId, address indexed creator, uint256 funds, uint256 threshold)",
+    "event ProofSubmitted(uint256 indexed projectId, string proof)",
+    "event ScoreSubmitted(uint256 indexed projectId, uint256 score, bool passed)",
+    "event FundsReleased(uint256 indexed projectId, address indexed creator, uint256 amount)",
+    "event FundsRefunded(uint256 indexed projectId, address indexed creator, uint256 amount)"
+];
+
+/**
+ * Returns an ethers Contract instance connected to the given signer or provider.
+ */
+export function getArbitContract(signerOrProvider) {
+    if (!CONTRACT_ADDRESS) {
+        console.warn("[ArbitContract] VITE_CONTRACT_ADDRESS is not set!");
+    }
+    return new ethers.Contract(CONTRACT_ADDRESS, ARBIT_CORE_ABI, signerOrProvider);
+}
+
+/**
+ * Creates a project on-chain by depositing ETH into escrow.
+ * @param {ethers.Signer} signer The wallet signer
+ * @param {number} thresholdInt AI score threshold (1-100)
+ * @param {number|string} amountHsk The amount of HSK to lock in escrow
+ * @returns {Promise<string>} The transaction hash
+ */
+export async function createProjectOnChain(signer, thresholdInt, amountHsk) {
+    const contract = getArbitContract(signer);
+    const value = ethers.parseEther(String(amountHsk));
+    console.log(`[ArbitContract] Creating project: threshold ${thresholdInt}, amount ${amountHsk} HSK`);
+    
+    const tx = await contract.createProject(thresholdInt, { value });
+    console.log('[ArbitContract] TX broadcasted:', tx.hash);
+    
+    const receipt = await tx.wait();
+    console.log('[ArbitContract] ✓ TX confirmed:', tx.hash);
+    return tx.hash;
+}
+
+/**
+ * Submits milestone proof text to the blockchain.
+ * @param {ethers.Signer} signer The wallet signer
+ * @param {number} projectId The on-chain project ID
+ * @param {string} proofString The proof content
+ * @returns {Promise<string>} The transaction hash
+ */
+export async function submitProofOnChain(signer, projectId, proofString) {
+    const contract = getArbitContract(signer);
+    console.log(`[ArbitContract] Submitting proof for project ${projectId}`);
+    
+    const tx = await contract.submitMilestoneProof(projectId, proofString);
+    console.log('[ArbitContract] TX broadcasted:', tx.hash);
+    
+    await tx.wait();
+    console.log('[ArbitContract] ✓ TX confirmed:', tx.hash);
+    return tx.hash;
+}
+
+/**
+ * AI Oracle submits a score. MUST BE CALLED BY THE ORACLE WALLET.
+ * @param {ethers.Signer} oracleSigner The oracle wallet signer
+ * @param {number} projectId The on-chain project ID
+ * @param {number} score The score (0-100)
+ * @returns {Promise<string>} The transaction hash
+ */
+export async function submitScoreOnChain(oracleSigner, projectId, score) {
+    const contract = getArbitContract(oracleSigner);
+    console.log(`[ArbitContract] Oracle submitting score ${score} for project ${projectId}`);
+    
+    // signature is reserved for future ECDSA oracle auth, pass '0x' for now
+    const tx = await contract.submitAIScore(projectId, score, "0x");
+    console.log('[ArbitContract] TX broadcasted:', tx.hash);
+    
+    await tx.wait();
+    console.log('[ArbitContract] ✓ TX confirmed:', tx.hash);
+    return tx.hash;
+}
+
+/**
+ * Releases funds to the creator. Fails if AI score < threshold.
+ * @param {ethers.Signer} signer Any wallet signer
+ * @param {number} projectId The on-chain project ID
+ * @returns {Promise<string>} The transaction hash
+ */
+export async function releaseFundsOnChain(signer, projectId) {
+    const contract = getArbitContract(signer);
+    console.log(`[ArbitContract] Attempting to release funds for project ${projectId}`);
+    
+    const tx = await contract.releaseFunds(projectId);
+    console.log('[ArbitContract] TX broadcasted:', tx.hash);
+    
+    await tx.wait();
+    console.log('[ArbitContract] ✓ TX confirmed:', tx.hash);
+    return tx.hash;
+}
+
+/**
+ * Refunds locked ETH to the creator if score < threshold or not yet scored.
+ * @param {ethers.Signer} signer The creator's wallet signer
+ * @param {number} projectId The on-chain project ID
+ * @returns {Promise<string>} The transaction hash
+ */
+export async function refundOnChain(signer, projectId) {
+    const contract = getArbitContract(signer);
+    console.log(`[ArbitContract] Attempting to refund project ${projectId}`);
+    
+    const tx = await contract.refund(projectId);
+    console.log('[ArbitContract] TX broadcasted:', tx.hash);
+    
+    await tx.wait();
+    console.log('[ArbitContract] ✓ TX confirmed:', tx.hash);
+    return tx.hash;
+}

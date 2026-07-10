@@ -13,6 +13,8 @@ import ProgressBar from './ProgressBar'
 import MilestoneCard from './MilestoneCard'
 import WalletPanel from './WalletPanel'
 import { Brain, CheckCircle } from 'lucide-react'
+import { releaseFundsOnChain } from '../services/arbitContract'
+import { getExplorerUrl } from '../services/evmWallet'
 
 const AI_BACKEND = 'http://localhost:3001'
 
@@ -78,30 +80,58 @@ export default function Dashboard({ project: initialProject, onFund, onTransacti
     /**
      * Called by MilestoneCard when user clicks "Evaluate with AI".
      * Hits the backend, then updates that specific milestone in local state.
+     * If score >= 80, triggers on-chain fund release.
      *
      * @param {string|number} milestoneId
      * @param {string}        proof        — the proof description text
      */
     const handleAIEvaluate = async (milestoneId, proof) => {
-        const response = await fetch(`${AI_BACKEND}/api/evaluate`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ workDescription: proof }),
-        })
+        if (!connectedWallet) {
+            alert('Please connect your wallet first to release funds on-chain.');
+            return;
+        }
 
-        const data = await response.json()
-        if (!response.ok) throw new Error(data.error || 'AI evaluation failed')
+        try {
+            const response = await fetch(`${AI_BACKEND}/api/evaluate`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ workDescription: proof }),
+            })
 
-        const score = data.score ?? 0
-        const status = score >= 80 ? 'approved' : 'rejected'
+            const data = await response.json()
+            if (!response.ok) throw new Error(data.error || 'AI evaluation failed')
 
-        console.log(`[Dashboard] Milestone ${milestoneId} → score=${score} → ${status}`)
+            const score = data.score ?? 0
+            const isApproved = score >= 80
+            const status = isApproved ? 'approved' : 'rejected'
+            
+            let txHash = null;
 
-        setMilestones(prev => prev.map(m =>
-            m.id === milestoneId
-                ? { ...m, proof, score, status }
-                : m
-        ))
+            console.log(`[Dashboard] Milestone ${milestoneId} → score=${score} → ${status}`)
+
+            if (isApproved) {
+                console.log(`[Dashboard] Triggering on-chain release for project ID: ${project.id}`);
+                // Use a default project ID 1 for testing since we don't have Supabase on_chain_project_id mapping in mock DB yet.
+                // In production, this would be project.on_chain_project_id
+                const onChainProjectId = project.on_chain_project_id || 1; 
+                
+                try {
+                    txHash = await releaseFundsOnChain(connectedWallet, onChainProjectId);
+                } catch (txErr) {
+                    console.error('[Dashboard] On-chain release failed:', txErr);
+                    throw new Error(txErr.reason || txErr.message || 'Smart contract fund release failed');
+                }
+            }
+
+            setMilestones(prev => prev.map(m =>
+                m.id === milestoneId
+                    ? { ...m, proof, score, status, tx_hash: txHash }
+                    : m
+            ))
+        } catch (err) {
+            console.error('[Dashboard] Evaluation error:', err);
+            alert(`Evaluation Error: ${err.message}`);
+        }
     }
 
     // ── Derived values ────────────────────────────────────────────────────────

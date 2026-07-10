@@ -14,6 +14,7 @@
  */
 import React, { useState } from 'react'
 import { Brain, CheckCircle, XCircle, Clock, Loader2, Send, ChevronDown, ChevronUp } from 'lucide-react'
+import { getExplorerUrl } from '../services/evmWallet'
 
 // ── Status badge ─────────────────────────────────────────────────────────────
 function StatusBadge({ status }) {
@@ -281,11 +282,24 @@ export default function MilestoneCard({ milestone, index, onEvaluate }) {
                             border: isApproved ? '1px solid rgba(16,185,129,0.2)' : '1px solid rgba(239,68,68,0.2)',
                         }}>
                             <Brain size={13} color={isApproved ? '#10b981' : '#f87171'} />
-                            <span style={{ fontSize: '0.75rem', fontWeight: 600, color: isApproved ? '#34d399' : '#f87171' }}>
+                            <span style={{ fontSize: '0.75rem', fontWeight: 600, color: isApproved ? '#34d399' : '#f87171', flex: 1 }}>
                                 {isApproved
-                                    ? `Score ${score}/100 — AI Approved. Funds will be released automatically.`
+                                    ? `Score ${score}/100 — AI Approved. Funds released.`
                                     : `Score ${score}/100 — AI Rejected. Score must be ≥ 80 to approve.`}
                             </span>
+                            {isApproved && milestone.tx_hash && (
+                                <a 
+                                    href={getExplorerUrl(milestone.tx_hash)} 
+                                    target="_blank" 
+                                    rel="noreferrer"
+                                    style={{
+                                        fontSize: '0.7rem', color: '#10b981', textDecoration: 'underline',
+                                        marginLeft: 'auto', whiteSpace: 'nowrap'
+                                    }}
+                                >
+                                    View on Explorer
+                                </a>
+                            )}
                         </div>
                     )}
 
