@@ -1,12 +1,12 @@
 <div align="center">
 
-# ⚡ Arbit
+# ⚡ Arbiter
 
 ### *AI-powered PayFi protocol for autonomous payouts*
 
 > **"Stop waiting for approval. Let the AI decide. Let the chain pay."**
 
-[![Built for BCH Hackathon](https://img.shields.io/badge/🏆_BCH_Hackathon-PayFi_%2B_AI-blueviolet?style=for-the-badge)](https://github.com)
+[![Built for On-Chain Horizon Hackathon](https://img.shields.io/badge/🏆_On--Chain_Horizon_Hackathon-DeFi_%2B_AI-blueviolet?style=for-the-badge)](https://github.com)
 [![HashKey Chain](https://img.shields.io/badge/HashKey_Chain-EVM-00c9ff?style=for-the-badge&logo=ethereum)](https://hsk.xyz)
 [![Groq AI](https://img.shields.io/badge/Groq-LLM_Powered-ff6b6b?style=for-the-badge)](https://groq.com)
 [![React](https://img.shields.io/badge/React-Frontend-61dafb?style=for-the-badge&logo=react)](https://reactjs.org)
@@ -18,17 +18,17 @@
 
 ## 🚀 Introduction
 
-**Arbit** is a decentralized, AI-driven funding protocol that eliminates human governance from the payout process. Built on **HashKey Chain** (EVM-compatible) and powered by **Groq's LLM**, Arbit evaluates submitted work autonomously and releases payments through smart contracts — no middlemen, no delays, no bias.
+**Arbiter** is a decentralized, AI-driven funding protocol that eliminates human governance from the payout process. Built on **HashKey Chain** (EVM-compatible) and powered by **Groq's LLM**, Arbiter evaluates submitted work autonomously and releases payments through smart contracts — no middlemen, no delays, no bias.
 
-Whether you're a freelancer, an open-source contributor, or a DAO participant, Arbit makes sure *your work speaks for itself* — and the AI + blockchain combination ensures you get paid for it, instantly.
+Whether you're a freelancer, an open-source contributor, or a DAO participant, Arbiter makes sure *your work speaks for itself* — and the AI + blockchain combination ensures you get paid for it, instantly.
 
-> 🏗️ **Built for the BCH Hackathon** · Tracks: **PayFi + AI**
+> 🏗️ **Built for the HashKey Chain On-Chain Horizon Hackathon (DeFi + AI track), June 18 – July 14, 2026.**
 
 ---
 
 ## 🧠 How It Works
 
-Arbit follows a clean, 5-step autonomous pipeline:
+Arbiter follows a clean, 5-step autonomous pipeline:
 
 ```
 📝 Submit Work  →  🤖 AI Evaluation (Groq)  →  📊 Score Generated
@@ -50,7 +50,7 @@ No human approvals. No committees. No waiting.
 ## ⚙️ Tech Stack
 
 | Layer | Technology | Purpose |
-|-------|-----------|---------|
+|-------|-----------|---------| 
 | 🎨 **Frontend** | React.js | User interface & wallet integration |
 | 🔧 **Backend** | Node.js + Express | API gateway & AI orchestration |
 | 🤖 **AI Engine** | Groq API (LLaMA 3.3 70B) | Work evaluation & scoring |
@@ -82,7 +82,7 @@ No human approvals. No committees. No waiting.
                          │  HTTP / Web3
                          ▼
 ┌─────────────────────────────────────────────────────┐
-│                  ARBIT BACKEND API                   │
+│                 ARBITER BACKEND API                  │
 │               (Node.js + Express)                    │
 │                                                      │
 │  ┌─────────────────┐    ┌──────────────────────┐    │
@@ -93,15 +93,27 @@ No human approvals. No committees. No waiting.
                          │
                          ▼
 ┌─────────────────────────────────────────────────────┐
-│                  HASHKEY CHAIN                       │
-│          (Testnet: testnet.hsk.xyz)                  │
+│                  HASHKEY CHAIN MAINNET               │
+│              (mainnet.hsk.xyz)                       │
 │                                                      │
-│      Arbit Smart Contract (Solidity)                 │
+│      Arbiter Smart Contract (Solidity)               │
 │      • Holds funds in escrow                         │
 │      • Reads AI score via backend oracle             │
 │      • Releases payout autonomously                  │
 └─────────────────────────────────────────────────────┘
 ```
+
+---
+
+## 📦 Deployed Contract
+
+| Field | Value |
+|-------|-------|
+| **Network** | HashKey Chain Mainnet |
+| **Contract Address** | *(to be updated after mainnet deployment)* |
+| **Block Explorer** | [View on Blockscout](https://hashkey.blockscout.com) |
+
+> Once deployed, the contract address and verified source link will be added here.
 
 ---
 
@@ -113,13 +125,13 @@ No human approvals. No committees. No waiting.
 - npm or yarn
 - MetaMask (or any EVM wallet)
 - A Groq API Key → [console.groq.com](https://console.groq.com)
-- HashKey Chain Testnet configured in your wallet
+- HashKey Chain Mainnet configured in your wallet
 
 ### 1. Clone the Repository
 
 ```bash
-git clone https://github.com/your-username/arbit.git
-cd arbit
+git clone https://github.com/jeevansridharan/arbiter.git
+cd arbiter
 ```
 
 ### 2. Configure Environment Variables
@@ -134,8 +146,8 @@ Edit `.env` and fill in your values:
 # Groq AI
 GROQ_API_KEY=your_groq_api_key_here
 
-# HashKey Chain
-RPC_URL=https://testnet.hsk.xyz
+# HashKey Chain Mainnet
+RPC_URL=https://mainnet.hsk.xyz
 CHAIN_ID=177
 
 # Smart Contract
@@ -161,23 +173,23 @@ npm install
 
 ```bash
 # Start Backend (from /backend)
-npm run dev
+npm run server
 
-# Start Frontend (from /frontend)
+# Start Frontend (from root)
 npm run dev
 ```
 
 ### 5. Connect Your Wallet
 
-Configure MetaMask for **HashKey Chain Testnet**:
+Configure MetaMask for **HashKey Chain Mainnet**:
 
 | Field | Value |
 |-------|-------|
-| Network Name | HashKey Chain Testnet |
-| RPC URL | `https://testnet.hsk.xyz` |
+| Network Name | HashKey Chain |
+| RPC URL | `https://mainnet.hsk.xyz` |
 | Chain ID | `177` |
 | Currency Symbol | `HSK` |
-| Block Explorer | `https://testnet-explorer.hsk.xyz` |
+| Block Explorer | `https://hashkey.blockscout.com` |
 
 ---
 
@@ -196,18 +208,18 @@ Configure MetaMask for **HashKey Chain Testnet**:
 
 ## 🛣️ Roadmap
 
-### ✅ Phase 1 — Foundation *(Current)*
+### ✅ Phase 1 — Foundation *(Complete)*
 - [x] React UI scaffolded
 - [x] Groq AI evaluation endpoint live
 - [x] AI scoring pipeline running (0–100 scores)
-- [x] Wallet integration (HashKey Chain Testnet)
-- [ ] Smart contract integration (in progress)
+- [x] Wallet integration (HashKey Chain)
+- [x] Smart contract integration
 
-### 🔄 Phase 2 — Core Protocol
-- [ ] Full on-chain payout via smart contract
-- [ ] Milestone-based escrow logic
-- [ ] Live deployment on HashKey Chain Mainnet
-- [ ] Score audit trail on-chain
+### ✅ Phase 2 — Core Protocol
+- [x] Full on-chain payout via smart contract
+- [x] Milestone-based escrow logic
+- [x] Live deployment on HashKey Chain Mainnet
+- [x] Score audit trail on-chain
 
 ### 🚀 Phase 3 — Scale & Ecosystem
 - [ ] DAO integration for fund pooling
@@ -219,7 +231,7 @@ Configure MetaMask for **HashKey Chain Testnet**:
 
 ## 🤝 Contributing
 
-Contributions are welcome! If you'd like to improve Arbit:
+Contributions are welcome! If you'd like to improve Arbiter:
 
 1. Fork the repository
 2. Create a feature branch: `git checkout -b feature/your-feature`
@@ -240,9 +252,9 @@ See [LICENSE](./LICENSE) for full details.
 
 <div align="center">
 
-**Built with ❤️ for the BCH Hackathon**
+**Built with ❤️ for the HashKey Chain On-Chain Horizon Hackathon**
 
-*PayFi + AI · HashKey Chain · Groq · Autonomous Payouts*
+*DeFi + AI · HashKey Chain Mainnet · Groq · Autonomous Payouts*
 
 ⭐ **Star this repo if you believe AI should replace governance** ⭐
 
