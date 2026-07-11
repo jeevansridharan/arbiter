@@ -39,12 +39,12 @@ function LoadingSpinner() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-export default function Dashboard({ project: initialProject, onFund, onTransaction, onReset }) {
+export default function Dashboard({ project: initialProject, onFund, onTransaction, onReset, initialSigner, onWalletConnect }) {
     const [project, setProject]             = useState(initialProject)
     const [milestones, setMilestones]       = useState([])
     const [loading, setLoading]             = useState(true)
     const [error, setError]                 = useState(null)
-    const [connectedWallet, setConnectedWallet] = useState(null)
+    const [connectedWallet, setConnectedWallet] = useState(initialSigner ?? null)
 
     // ── Fetch project from DB ─────────────────────────────────────────────────
     const fetchProjectData = useCallback(async (isSilent = false) => {
@@ -277,7 +277,10 @@ export default function Dashboard({ project: initialProject, onFund, onTransacti
             {/* ── Wallet panel ───────────────────────────────────────────────── */}
             <WalletPanel
                 onRealFund={handleFundComplete}
-                onWalletConnect={setConnectedWallet}
+                onWalletConnect={(signer) => {
+                    setConnectedWallet(signer)
+                    if (onWalletConnect) onWalletConnect(signer)
+                }}
             />
 
             {/* ── Milestones section ─────────────────────────────────────────── */}

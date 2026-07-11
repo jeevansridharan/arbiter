@@ -19,6 +19,7 @@ export default function ProjectForm({ onProjectCreate, walletAddress }) {
     const [title, setTitle] = useState('')
     const [description, setDescription] = useState('')
     const [fundingTarget, setFundingTarget] = useState('')
+    const [threshold, setThreshold] = useState('80')   // AI score threshold (1-100)
     const [milestoneInput, setMilestoneInput] = useState('')
     const [milestones, setMilestones] = useState([])
     const [errors, setErrors] = useState({})
@@ -49,6 +50,8 @@ export default function ProjectForm({ onProjectCreate, walletAddress }) {
         if (!title.trim()) newErrors.title = 'Project title is required'
         if (!description.trim()) newErrors.description = 'Description is required'
         if (!fundingTarget || Number(fundingTarget) <= 0) newErrors.fundingTarget = 'Enter a valid funding target'
+        const thr = Number(threshold)
+        if (!threshold || isNaN(thr) || thr < 1 || thr > 100) newErrors.threshold = 'Threshold must be between 1 and 100'
         if (milestones.length === 0) newErrors.milestones = 'Add at least one milestone'
         return newErrors
     }
@@ -71,8 +74,9 @@ export default function ProjectForm({ onProjectCreate, walletAddress }) {
         const projectData = {
             title: title.trim(),
             description: description.trim(),
-            goal_amount: Number(fundingTarget),       // ← DB column name
-            owner_wallet: walletAddress ?? '0xAddressUnknown',  // ← DB column name
+            goal_amount: Number(fundingTarget),
+            threshold: Math.round(Number(threshold)),  // AI score threshold for on-chain
+            owner_wallet: walletAddress ?? '0xAddressUnknown',
             milestones: milestones.map((m, i) => ({
                 id: i,
                 title: m,
@@ -163,6 +167,29 @@ export default function ProjectForm({ onProjectCreate, walletAddress }) {
                         className="input-web3 resize-none"
                     />
                     {errors.description && <p className="mt-1.5 text-xs text-rose-400">{errors.description}</p>}
+                </div>
+
+                {/* AI Score Threshold */}
+                <div>
+                    <label className="block text-sm font-semibold text-slate-300 mb-2">
+                        AI Score Threshold (1–100)
+                    </label>
+                    <div className="relative">
+                        <input
+                            id="score-threshold"
+                            type="number"
+                            min="1"
+                            max="100"
+                            step="1"
+                            value={threshold}
+                            onChange={(e) => setThreshold(e.target.value)}
+                            placeholder="80"
+                            className="input-web3 pr-16"
+                        />
+                        <span className="absolute right-4 top-1/2 -translate-y-1/2 text-sm font-semibold" style={{ color: '#a78bfa' }}>/ 100</span>
+                    </div>
+                    <p className="mt-1.5 text-xs text-slate-500">Minimum AI score required for the milestone to pass and funds to be releasable. Default: 80.</p>
+                    {errors.threshold && <p className="mt-1 text-xs text-rose-400">{errors.threshold}</p>}
                 </div>
 
                 {/* Funding Target */}
