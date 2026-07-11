@@ -1,10 +1,14 @@
 /**
  * Dashboard.jsx — Arbit Project Dashboard
  *
- * AI evaluation is now milestone-scoped:
+ * AI evaluation is milestone-scoped:
  *   Each MilestoneCard has its own proof textarea + "Evaluate with AI" button.
  *   Clicking evaluate → POST /api/evaluate → score stored in that milestone's state.
- *   score >= 80 → approved, else → rejected.
+ *   score >= 80 → status 'ai_passed' (in-memory). Funds NOT auto-released.
+ *
+ * Fund release is MANUAL:
+ *   After AI passes a milestone, a "Release Funds" button appears.
+ *   Mentor must click it → releaseFundsOnChain() → Supabase update → 'approved'.
  */
 
 import React, { useState, useEffect, useCallback } from 'react'
@@ -14,7 +18,6 @@ import MilestoneCard from './MilestoneCard'
 import WalletPanel from './WalletPanel'
 import { Brain, CheckCircle } from 'lucide-react'
 import { releaseFundsOnChain } from '../services/arbitContract'
-import { getExplorerUrl } from '../services/evmWallet'
 
 const AI_BACKEND = 'http://localhost:3001'
 
@@ -79,18 +82,17 @@ export default function Dashboard({ project: initialProject, onFund, onTransacti
     // ── AI Evaluate a milestone ───────────────────────────────────────────────
     /**
      * Called by MilestoneCard when user clicks "Evaluate with AI".
-     * Hits the backend, then updates that specific milestone in local state.
-     * If score >= 80, triggers on-chain fund release.
+     * Hits the backend and updates that milestone's score + status in local state.
+     * Does NOT release funds — that is a separate manual step.
+     *
+     * Status after evaluation:
+     *   score >= 80  →  'ai_passed'  (in-memory only, NOT written to Supabase)
+     *   score < 80   →  'rejected'
      *
      * @param {string|number} milestoneId
-     * @param {string}        proof        — the proof description text
+     * @param {string}        proof  — the proof description text
      */
     const handleAIEvaluate = async (milestoneId, proof) => {
-        if (!connectedWallet) {
-            alert('Please connect your wallet first to release funds on-chain.');
-            return;
-        }
-
         try {
             const response = await fetch(`${AI_BACKEND}/api/evaluate`, {
                 method: 'POST',
@@ -101,37 +103,77 @@ export default function Dashboard({ project: initialProject, onFund, onTransacti
             const data = await response.json()
             if (!response.ok) throw new Error(data.error || 'AI evaluation failed')
 
-            const score = data.score ?? 0
-            const isApproved = score >= 80
-            const status = isApproved ? 'approved' : 'rejected'
-            
-            let txHash = null;
+            const score  = data.score  ?? 0
+            const reason = data.reason ?? data.reasoning ?? ''
+            const status = score >= 80 ? 'ai_passed' : 'rejected'
 
             console.log(`[Dashboard] Milestone ${milestoneId} → score=${score} → ${status}`)
 
-            if (isApproved) {
-                console.log(`[Dashboard] Triggering on-chain release for project ID: ${project.id}`);
-                // Use a default project ID 1 for testing since we don't have Supabase on_chain_project_id mapping in mock DB yet.
-                // In production, this would be project.on_chain_project_id
-                const onChainProjectId = project.on_chain_project_id || 1; 
-                
-                try {
-                    txHash = await releaseFundsOnChain(connectedWallet, onChainProjectId);
-                } catch (txErr) {
-                    console.error('[Dashboard] On-chain release failed:', txErr);
-                    throw new Error(txErr.reason || txErr.message || 'Smart contract fund release failed');
-                }
-            }
-
             setMilestones(prev => prev.map(m =>
                 m.id === milestoneId
-                    ? { ...m, proof, score, status, tx_hash: txHash }
+                    ? { ...m, proof, score, status, reason, tx_hash: null }
                     : m
             ))
         } catch (err) {
-            console.error('[Dashboard] Evaluation error:', err);
-            alert(`Evaluation Error: ${err.message}`);
+            console.error('[Dashboard] Evaluation error:', err)
+            throw err // Re-throw so MilestoneCard displays the error locally
         }
+    }
+
+    // ── Manual Fund Release ───────────────────────────────────────────────────
+    /**
+     * Called by MilestoneCard when the mentor clicks "Release Funds".
+     * Validates the on-chain project ID (must be a numeric integer — NOT a UUID),
+     * calls the smart contract, updates Supabase, then updates local state.
+     *
+     * Throws named errors that MilestoneCard handles:
+     *   'NO_ONCHAIN_ID'         — project was not created on-chain
+     *   'WALLET_NOT_CONNECTED'  — wallet needs to be connected first
+     *
+     * @param {string|number} milestoneId
+     * @returns {Promise<string>} tx hash on success
+     */
+    const handleReleaseFunds = async (milestoneId) => {
+        // ── 1. Validate on-chain project ID ──────────────────────────────────
+        const rawId = project?.on_chain_project_id
+        const onChainProjectId = rawId != null ? Number(rawId) : NaN
+
+        if (
+            rawId == null ||
+            String(rawId).includes('-') ||      // UUID guard — Supabase UUIDs have hyphens
+            isNaN(onChainProjectId) ||
+            !Number.isInteger(onChainProjectId) ||
+            onChainProjectId < 0
+        ) {
+            throw new Error('NO_ONCHAIN_ID')
+        }
+
+        // ── 2. Ensure wallet is connected ─────────────────────────────────────
+        if (!connectedWallet) {
+            throw new Error('WALLET_NOT_CONNECTED')
+        }
+
+        // ── 3. Call the smart contract ────────────────────────────────────────
+        console.log(`[Dashboard] Releasing funds on-chain: project #${onChainProjectId}, milestone ${milestoneId}`)
+        const txHash = await releaseFundsOnChain(connectedWallet, onChainProjectId)
+
+        // ── 4. Update Supabase milestone status to 'approved' ─────────────────
+        try {
+            const { updateMilestoneStatus } = await import('../lib/db/milestones')
+            await updateMilestoneStatus(milestoneId, 'approved')
+        } catch (dbErr) {
+            // Log but don't block UI — the on-chain tx already succeeded
+            console.warn('[Dashboard] Supabase update failed (tx still confirmed):', dbErr.message)
+        }
+
+        // ── 5. Update local state ─────────────────────────────────────────────
+        setMilestones(prev => prev.map(m =>
+            m.id === milestoneId
+                ? { ...m, status: 'approved', tx_hash: txHash }
+                : m
+        ))
+
+        return txHash
     }
 
     // ── Derived values ────────────────────────────────────────────────────────
@@ -150,6 +192,15 @@ export default function Dashboard({ project: initialProject, onFund, onTransacti
         || (project?.description?.includes('[On-Chain Address: ')
             ? project.description.match(/\[On-Chain Address: (bchtest:[^\]]+)\]/)?.[1]
             : null)
+
+    // Whether this project has a valid numeric on-chain ID (not a UUID, not null)
+    const rawId = project?.on_chain_project_id
+    const hasValidOnChainId = (
+        rawId != null &&
+        !String(rawId).includes('-') &&
+        Number.isInteger(Number(rawId)) &&
+        Number(rawId) >= 0
+    )
 
     if (loading && !project) return <LoadingSpinner />
 
@@ -199,9 +250,9 @@ export default function Dashboard({ project: initialProject, onFund, onTransacti
             {/* ── Stats row ──────────────────────────────────────────────────── */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '14px', marginBottom: '20px' }}>
                 {[
-                    { label: 'Target',        value: `${fundingTarget.toFixed(2)} HSK`, color: '#10b981' },
-                    { label: 'Raised',         value: `${fundedAmount.toFixed(4)} HSK`, color: '#34d399' },
-                    { label: 'AI Evaluations', value: `${approvedCount}/${milestones.length} done`, color: '#a78bfa' },
+                    { label: 'Target',     value: `${fundingTarget.toFixed(2)} HSK`,               color: '#10b981' },
+                    { label: 'Raised',     value: `${fundedAmount.toFixed(4)} HSK`,                 color: '#34d399' },
+                    { label: 'Milestones', value: `${approvedCount}/${milestones.length} released`,  color: '#a78bfa' },
                 ].map(({ label, value, color }) => (
                     <div key={label} style={{
                         background: 'rgba(15,17,35,0.85)', border: '1px solid rgba(255,255,255,0.06)',
@@ -239,7 +290,7 @@ export default function Dashboard({ project: initialProject, onFund, onTransacti
                             Milestones
                         </h2>
                         <p style={{ fontSize: '0.78rem', color: '#475569' }}>
-                            Submit proof per milestone — AI evaluates and auto-approves at score ≥ 80
+                            Submit proof per milestone — AI evaluates, mentor manually releases funds
                         </p>
                     </div>
                     <div style={{
@@ -247,7 +298,7 @@ export default function Dashboard({ project: initialProject, onFund, onTransacti
                         padding: '4px 12px', borderRadius: '999px',
                         background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.2)',
                     }}>
-                        {approvedCount}/{milestones.length} approved
+                        {approvedCount}/{milestones.length} released
                     </div>
                 </div>
 
@@ -260,6 +311,9 @@ export default function Dashboard({ project: initialProject, onFund, onTransacti
                                 milestone={milestone}
                                 index={index}
                                 onEvaluate={handleAIEvaluate}
+                                onReleaseFunds={handleReleaseFunds}
+                                noOnChainId={!hasValidOnChainId}
+                                walletConnected={!!connectedWallet}
                             />
                         ))
                     ) : (
@@ -269,7 +323,7 @@ export default function Dashboard({ project: initialProject, onFund, onTransacti
                     )}
                 </div>
 
-                {/* All approved banner */}
+                {/* All released banner */}
                 {approvedCount === milestones.length && milestones.length > 0 && (
                     <div style={{
                         marginTop: '20px', padding: '18px', borderRadius: '12px', textAlign: 'center',

@@ -5,15 +5,18 @@
  *   • Proof textarea  — what the creator submits
  *   • "Evaluate with AI" button
  *   • Score bar (animated)
- *   • Status badge: Pending / Approved / Rejected
+ *   • Status badge: Pending / AI Passed / Funds Released / Rejected
  *
  * Props:
- *   milestone  — { id, title, description?, amount?, score, status, proof }
- *   index      — display number
- *   onEvaluate — async (milestoneId, proof) => void  (provided by Dashboard)
+ *   milestone      — { id, title, description?, amount?, score, status, proof, reason?, tx_hash? }
+ *   index          — display number
+ *   onEvaluate     — async (milestoneId, proof) => void  (provided by Dashboard)
+ *   onReleaseFunds — async (milestoneId) => string txHash  (provided by Dashboard)
+ *   noOnChainId    — boolean: project was not created on-chain, disable release
+ *   walletConnected — boolean: whether a wallet is currently connected
  */
 import React, { useState } from 'react'
-import { Brain, CheckCircle, XCircle, Clock, Loader2, Send, ChevronDown, ChevronUp } from 'lucide-react'
+import { Brain, CheckCircle, XCircle, Clock, Loader2, Send, ChevronDown, ChevronUp, Zap } from 'lucide-react'
 import { getExplorerUrl } from '../services/evmWallet'
 
 // ── Status badge ─────────────────────────────────────────────────────────────
@@ -28,7 +31,21 @@ function StatusBadge({ status }) {
                 border: '1px solid rgba(16,185,129,0.3)',
                 color: '#34d399',
             }}>
-                <CheckCircle size={11} /> AI Approved
+                <CheckCircle size={11} /> Funds Released
+            </span>
+        )
+    }
+    if (status === 'ai_passed') {
+        return (
+            <span style={{
+                display: 'inline-flex', alignItems: 'center', gap: '5px',
+                fontSize: '0.68rem', fontWeight: 700, padding: '3px 10px',
+                borderRadius: '999px', whiteSpace: 'nowrap',
+                background: 'rgba(20,184,166,0.12)',
+                border: '1px solid rgba(20,184,166,0.35)',
+                color: '#2dd4bf',
+            }}>
+                <Zap size={11} /> AI Passed
             </span>
         )
     }
@@ -82,26 +99,40 @@ function ScoreBar({ score }) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-export default function MilestoneCard({ milestone, index, onEvaluate }) {
-    const { id, title, description, score, status, amount } = milestone
+export default function MilestoneCard({ milestone, index, onEvaluate, onReleaseFunds, noOnChainId, walletConnected }) {
+    const { id, title, description, score, status, amount, reason, tx_hash } = milestone
 
-    // Local state for proof text + loading + error + expand toggle
-    const [proof, setProof]         = useState(milestone.proof ?? '')
+    // Local state
+    const [proof, setProof]           = useState(milestone.proof ?? '')
     const [evaluating, setEvaluating] = useState(false)
     const [evalError, setEvalError]   = useState('')
     const [expanded, setExpanded]     = useState(status === 'pending')
+    const [releasing, setReleasing]   = useState(false)
+    const [releaseError, setReleaseError] = useState('')
 
     const isApproved = status === 'approved'
+    const isAIPassed = status === 'ai_passed'
     const isRejected = status === 'rejected'
     const isScored   = typeof score === 'number'
 
     // Border glow per status
     const borderColor = isApproved
         ? 'rgba(16,185,129,0.35)'
-        : isRejected
-            ? 'rgba(239,68,68,0.25)'
-            : 'rgba(255,255,255,0.06)'
+        : isAIPassed
+            ? 'rgba(20,184,166,0.3)'
+            : isRejected
+                ? 'rgba(239,68,68,0.25)'
+                : 'rgba(255,255,255,0.06)'
 
+    const cardBg = isApproved
+        ? 'rgba(16,185,129,0.04)'
+        : isAIPassed
+            ? 'rgba(20,184,166,0.03)'
+            : isRejected
+                ? 'rgba(239,68,68,0.03)'
+                : 'rgba(15,17,35,0.7)'
+
+    // ── Evaluate handler ──────────────────────────────────────────────────────
     const handleEvaluate = async () => {
         if (!proof.trim()) {
             setEvalError('Please describe your proof before evaluating.')
@@ -109,6 +140,7 @@ export default function MilestoneCard({ milestone, index, onEvaluate }) {
         }
         setEvaluating(true)
         setEvalError('')
+        setReleaseError('')
         try {
             await onEvaluate(id, proof)
         } catch (e) {
@@ -118,13 +150,28 @@ export default function MilestoneCard({ milestone, index, onEvaluate }) {
         }
     }
 
+    // ── Release funds handler ─────────────────────────────────────────────────
+    const handleRelease = async () => {
+        setReleasing(true)
+        setReleaseError('')
+        try {
+            await onReleaseFunds(id)
+        } catch (e) {
+            if (e.message === 'NO_ONCHAIN_ID') {
+                setReleaseError('This project was not created on-chain — funds cannot be released.')
+            } else if (e.message === 'WALLET_NOT_CONNECTED') {
+                setReleaseError('Please connect your wallet first, then click Release Funds.')
+            } else {
+                setReleaseError(e.reason || e.message || 'Transaction failed. Please try again.')
+            }
+        } finally {
+            setReleasing(false)
+        }
+    }
+
     return (
         <div style={{
-            background: isApproved
-                ? 'rgba(16,185,129,0.04)'
-                : isRejected
-                    ? 'rgba(239,68,68,0.03)'
-                    : 'rgba(15,17,35,0.7)',
+            background: cardBg,
             border: `1px solid ${borderColor}`,
             borderRadius: '16px',
             padding: '20px 22px',
@@ -139,10 +186,10 @@ export default function MilestoneCard({ milestone, index, onEvaluate }) {
                         width: '32px', height: '32px', borderRadius: '9px',
                         display: 'flex', alignItems: 'center', justifyContent: 'center',
                         fontSize: '0.8rem', fontWeight: 800, flexShrink: 0, marginTop: '2px',
-                        background: isApproved ? 'rgba(16,185,129,0.2)' : 'rgba(255,255,255,0.06)',
-                        color: isApproved ? '#10b981' : '#64748b',
+                        background: isApproved ? 'rgba(16,185,129,0.2)' : isAIPassed ? 'rgba(20,184,166,0.15)' : 'rgba(255,255,255,0.06)',
+                        color: isApproved ? '#10b981' : isAIPassed ? '#2dd4bf' : '#64748b',
                     }}>
-                        {isApproved ? '✓' : index + 1}
+                        {isApproved ? '✓' : isAIPassed ? '★' : index + 1}
                     </div>
 
                     {/* Title + subtitle */}
@@ -158,7 +205,7 @@ export default function MilestoneCard({ milestone, index, onEvaluate }) {
                     </div>
                 </div>
 
-                {/* Right: badge + toggle */}
+                {/* Right: amount + badge + toggle */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
                     {amount != null && (
                         <span style={{ fontSize: '0.72rem', color: '#34d399', fontWeight: 700 }}>
@@ -195,7 +242,7 @@ export default function MilestoneCard({ milestone, index, onEvaluate }) {
                         value={proof}
                         onChange={e => { setProof(e.target.value); setEvalError('') }}
                         placeholder={`Describe what you achieved for "${title}"…\nEx: Deployed the smart contract at 0x… Tested with 500 transactions…`}
-                        disabled={isApproved || evaluating}
+                        disabled={isApproved || isAIPassed || evaluating}
                         rows={4}
                         style={{
                             width: '100%',
@@ -211,9 +258,9 @@ export default function MilestoneCard({ milestone, index, onEvaluate }) {
                             outline: 'none',
                             fontFamily: 'inherit',
                             transition: 'border-color 0.2s',
-                            opacity: isApproved ? 0.6 : 1,
+                            opacity: (isApproved || isAIPassed) ? 0.6 : 1,
                         }}
-                        onFocus={e => { if (!isApproved) e.currentTarget.style.borderColor = 'rgba(167,139,250,0.4)' }}
+                        onFocus={e => { if (!isApproved && !isAIPassed) e.currentTarget.style.borderColor = 'rgba(167,139,250,0.4)' }}
                         onBlur={e => e.currentTarget.style.borderColor = evalError ? 'rgba(239,68,68,0.4)' : 'rgba(255,255,255,0.07)'}
                     />
 
@@ -223,8 +270,8 @@ export default function MilestoneCard({ milestone, index, onEvaluate }) {
                         </p>
                     )}
 
-                    {/* Evaluate button */}
-                    {!isApproved && (
+                    {/* Evaluate button — hidden once approved */}
+                    {!isApproved && !isAIPassed && (
                         <button
                             onClick={handleEvaluate}
                             disabled={evaluating || !proof.trim()}
@@ -272,44 +319,179 @@ export default function MilestoneCard({ milestone, index, onEvaluate }) {
                         </button>
                     )}
 
-                    {/* AI result note */}
+                    {/* ── AI Result Panel ──────────────────────────────────── */}
                     {isScored && (
-                        <div style={{
-                            marginTop: '14px',
-                            display: 'flex', alignItems: 'center', gap: '8px',
-                            padding: '10px 14px', borderRadius: '10px',
-                            background: isApproved ? 'rgba(16,185,129,0.07)' : 'rgba(239,68,68,0.06)',
-                            border: isApproved ? '1px solid rgba(16,185,129,0.2)' : '1px solid rgba(239,68,68,0.2)',
-                        }}>
-                            <Brain size={13} color={isApproved ? '#10b981' : '#f87171'} />
-                            <span style={{ fontSize: '0.75rem', fontWeight: 600, color: isApproved ? '#34d399' : '#f87171', flex: 1 }}>
-                                {isApproved
-                                    ? `Score ${score}/100 — AI Approved. Funds released.`
-                                    : `Score ${score}/100 — AI Rejected. Score must be ≥ 80 to approve.`}
-                            </span>
-                            {isApproved && milestone.tx_hash && (
-                                <a 
-                                    href={getExplorerUrl(milestone.tx_hash)} 
-                                    target="_blank" 
-                                    rel="noreferrer"
-                                    style={{
-                                        fontSize: '0.7rem', color: '#10b981', textDecoration: 'underline',
-                                        marginLeft: 'auto', whiteSpace: 'nowrap'
-                                    }}
-                                >
-                                    View on Explorer
-                                </a>
+                        <div style={{ marginTop: '16px' }}>
+
+                            {/* ── REJECTED ───────────────────────────────────── */}
+                            {isRejected && (
+                                <div style={{
+                                    padding: '14px 16px', borderRadius: '12px',
+                                    background: 'rgba(239,68,68,0.06)',
+                                    border: '1px solid rgba(239,68,68,0.2)',
+                                }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: reason ? '8px' : 0 }}>
+                                        <XCircle size={14} color="#f87171" />
+                                        <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#f87171' }}>
+                                            AI Recommendation: Rejected
+                                        </span>
+                                        <span style={{ marginLeft: 'auto', fontSize: '0.75rem', fontWeight: 700, color: '#f87171' }}>
+                                            Score: {score}/100
+                                        </span>
+                                    </div>
+                                    {reason && (
+                                        <p style={{ fontSize: '0.78rem', color: '#94a3b8', lineHeight: 1.55, marginTop: '4px' }}>
+                                            {reason}
+                                        </p>
+                                    )}
+                                    <p style={{ fontSize: '0.7rem', color: '#64748b', marginTop: '8px', fontStyle: 'italic' }}>
+                                        Score must be ≥ 80 to approve. Improve your proof and re-evaluate.
+                                    </p>
+                                </div>
+                            )}
+
+                            {/* ── AI PASSED — awaiting manual release ────────── */}
+                            {isAIPassed && (
+                                <div style={{
+                                    padding: '14px 16px', borderRadius: '12px',
+                                    background: 'rgba(20,184,166,0.06)',
+                                    border: '1px solid rgba(20,184,166,0.25)',
+                                }}>
+                                    {/* Header */}
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                                        <CheckCircle size={14} color="#2dd4bf" />
+                                        <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#2dd4bf' }}>
+                                            ✅ AI Recommendation: Approved
+                                        </span>
+                                        <span style={{ marginLeft: 'auto', fontSize: '0.75rem', fontWeight: 700, color: '#2dd4bf' }}>
+                                            Score: {score}/100
+                                        </span>
+                                    </div>
+
+                                    {/* Reasoning */}
+                                    {reason && (
+                                        <p style={{ fontSize: '0.78rem', color: '#94a3b8', lineHeight: 1.55, marginBottom: '14px' }}>
+                                            {reason}
+                                        </p>
+                                    )}
+
+                                    {/* No on-chain ID warning */}
+                                    {noOnChainId ? (
+                                        <div style={{
+                                            padding: '10px 14px', borderRadius: '10px',
+                                            background: 'rgba(234,179,8,0.08)', border: '1px solid rgba(234,179,8,0.25)',
+                                        }}>
+                                            <p style={{ fontSize: '0.75rem', color: '#fbbf24', fontWeight: 600 }}>
+                                                ⚠ This project was not created on-chain — funds cannot be released.
+                                            </p>
+                                        </div>
+                                    ) : (
+                                        /* Release Funds button */
+                                        <div>
+                                            <button
+                                                id={`release-funds-${id}`}
+                                                onClick={handleRelease}
+                                                disabled={releasing}
+                                                style={{
+                                                    width: '100%',
+                                                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
+                                                    padding: '12px 20px', borderRadius: '11px',
+                                                    cursor: releasing ? 'not-allowed' : 'pointer',
+                                                    background: releasing
+                                                        ? 'rgba(16,185,129,0.08)'
+                                                        : 'linear-gradient(135deg, #10b981, #059669)',
+                                                    border: releasing
+                                                        ? '1px solid rgba(16,185,129,0.2)'
+                                                        : '1px solid rgba(16,185,129,0.4)',
+                                                    color: releasing ? '#10b981' : '#fff',
+                                                    fontSize: '0.88rem', fontWeight: 800,
+                                                    letterSpacing: '0.02em',
+                                                    transition: 'all 0.2s',
+                                                    boxShadow: releasing ? 'none' : '0 0 24px rgba(16,185,129,0.35)',
+                                                }}
+                                                onMouseEnter={e => {
+                                                    if (!releasing) {
+                                                        e.currentTarget.style.boxShadow = '0 4px 28px rgba(16,185,129,0.55)'
+                                                        e.currentTarget.style.transform = 'translateY(-1px)'
+                                                    }
+                                                }}
+                                                onMouseLeave={e => {
+                                                    e.currentTarget.style.boxShadow = releasing ? 'none' : '0 0 24px rgba(16,185,129,0.35)'
+                                                    e.currentTarget.style.transform = 'translateY(0)'
+                                                }}
+                                            >
+                                                {releasing ? (
+                                                    <>
+                                                        <Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} />
+                                                        Releasing Funds…
+                                                    </>
+                                                ) : (
+                                                    '💸 Release Funds'
+                                                )}
+                                            </button>
+
+                                            {!walletConnected && !releasing && (
+                                                <p style={{ fontSize: '0.7rem', color: '#64748b', textAlign: 'center', marginTop: '6px' }}>
+                                                    Connect your wallet above, then click Release Funds.
+                                                </p>
+                                            )}
+
+                                            {releaseError && (
+                                                <div style={{
+                                                    marginTop: '10px', padding: '10px 14px', borderRadius: '10px',
+                                                    background: 'rgba(239,68,68,0.07)', border: '1px solid rgba(239,68,68,0.2)',
+                                                }}>
+                                                    <p style={{ fontSize: '0.75rem', color: '#f87171', fontWeight: 600 }}>
+                                                        ⚠ {releaseError}
+                                                    </p>
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+
+                            {/* ── APPROVED (funds released on-chain) ─────────── */}
+                            {isApproved && (
+                                <div style={{
+                                    padding: '14px 16px', borderRadius: '12px',
+                                    background: 'rgba(16,185,129,0.07)',
+                                    border: '1px solid rgba(16,185,129,0.2)',
+                                }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                        <CheckCircle size={14} color="#10b981" />
+                                        <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#34d399', flex: 1 }}>
+                                            ✅ Funds Released — Score: {score}/100
+                                        </span>
+                                        {tx_hash && (
+                                            <a
+                                                href={getExplorerUrl(tx_hash)}
+                                                target="_blank"
+                                                rel="noreferrer"
+                                                style={{
+                                                    fontSize: '0.7rem', color: '#10b981',
+                                                    textDecoration: 'underline', whiteSpace: 'nowrap', opacity: 0.8,
+                                                }}
+                                            >
+                                                View Tx ↗
+                                            </a>
+                                        )}
+                                    </div>
+                                    {tx_hash && (
+                                        <p style={{ fontSize: '0.65rem', color: '#475569', marginTop: '6px', fontFamily: 'monospace', wordBreak: 'break-all' }}>
+                                            {tx_hash}
+                                        </p>
+                                    )}
+                                    <p style={{ fontSize: '0.65rem', color: '#10b981', opacity: 0.5, textAlign: 'center', marginTop: '10px', fontWeight: 700, letterSpacing: '0.08em' }}>
+                                        🤖 SECURED BY AI ORACLE · HASHKEY CHAIN
+                                    </p>
+                                </div>
                             )}
                         </div>
                     )}
-
-                    {isApproved && (
-                        <p style={{ fontSize: '0.65rem', color: '#10b981', opacity: 0.5, textAlign: 'center', marginTop: '10px', fontWeight: 700, letterSpacing: '0.08em' }}>
-                            🤖 SECURED BY AI ORACLE · HASHKEY CHAIN
-                        </p>
-                    )}
                 </div>
             )}
+
 
             {/* Spin keyframe */}
             <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
