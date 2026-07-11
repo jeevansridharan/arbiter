@@ -84,7 +84,7 @@ export function getArbitContract(signerOrProvider) {
  * @param {ethers.Signer} signer
  * @param {number} thresholdInt AI score threshold (1–100)
  * @param {number|string} amountHsk Amount of HSK to lock
- * @returns {Promise<string>} Transaction hash
+ * @returns {Promise<{ txHash: string, projectId: number }>}
  */
 export async function createProjectOnChain(signer, thresholdInt, amountHsk) {
     const contract = getArbitContract(signer);
@@ -93,10 +93,35 @@ export async function createProjectOnChain(signer, thresholdInt, amountHsk) {
 
     const tx = await contract.createProject(thresholdInt, { value });
     console.log('[ArbitContract] TX broadcasted:', tx.hash);
-    await tx.wait();
+
+    const receipt = await tx.wait();
     console.log('[ArbitContract] ✓ TX confirmed:', tx.hash);
-    return tx.hash;
+
+    // ── Parse ProjectCreated(uint256 indexed projectId, ...) from logs ────────
+    let projectId = null;
+    for (const log of receipt.logs) {
+        try {
+            const parsed = contract.interface.parseLog(log);
+            if (parsed && parsed.name === 'ProjectCreated') {
+                projectId = Number(parsed.args.projectId);
+                break;
+            }
+        } catch (_) {
+            // Not a log for this contract — skip
+        }
+    }
+
+    if (projectId === null || isNaN(projectId)) {
+        throw new Error(
+            'Transaction confirmed but ProjectCreated event not found in logs. ' +
+            'The on-chain projectId could not be determined.'
+        );
+    }
+
+    console.log(`[ArbitContract] ✓ On-chain projectId: ${projectId}`);
+    return { txHash: tx.hash, projectId };
 }
+
 
 /**
  * Submits milestone proof text to the blockchain.

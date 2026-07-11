@@ -98,6 +98,14 @@ export async function updateProjectStatus(id, status) {
     return { data: updated, error: null }
 }
 
+export async function updateProjectOnChainId(id, on_chain_project_id) {
+    await delay(0);    // synchronous-ish — just run the update
+    const updated = mockDB.update(TABLE, id, { on_chain_project_id })
+    if (!updated) return { data: null, error: { message: 'Project not found for on-chain ID update' } }
+    return { data: updated, error: null }
+}
+
+
 export async function deleteProject(id) {
     await delay();
     const ok = mockDB.delete(TABLE, id)
