@@ -1,6 +1,6 @@
 /**
  * pages/DashboardPage.jsx
- * Arbit — AI-powered autonomous funding protocol on HashKey Chain
+ * Arbit — AI-assisted milestone escrow protocol on HashKey Chain
  * Overview stats + quick-access cards
  */
 
@@ -129,10 +129,10 @@ export default function DashboardPage() {
                             Welcome to Arbit
                         </h1>
                         <p style={{ color: '#10b981', fontSize: '0.88rem', fontWeight: 600, marginBottom: '4px' }}>
-                            AI-powered autonomous funding protocol
+                            AI-assisted milestone escrow protocol
                         </p>
                         <p style={{ color: '#64748b', fontSize: '0.82rem' }}>
-                            Autonomous funding powered by AI decision-making
+                            AI evaluates, funders approve, funds release on-chain
                         </p>
                     </div>
                     {/* Refresh button */}
@@ -215,7 +215,7 @@ export default function DashboardPage() {
                     {[
                         { step: '01', title: 'Create & Fund', desc: 'Lock HSK into escrow and define your milestone score threshold', color: '#10b981', Icon: FolderKanban },
                         { step: '02', title: 'Submit Proof', desc: 'Creator submits milestone proof — text or IPFS hash', color: '#a78bfa', Icon: Brain },
-                        { step: '03', title: 'AI Decides', desc: 'AI oracle scores proof (0–100). Score ≥ threshold → funds auto-released', color: '#06b6d4', Icon: Shield },
+                        { step: '03', title: 'Funder Approves', desc: 'Funder reviews the AI score. Score ≥ threshold → funder sends releaseFunds() on-chain', color: '#06b6d4', Icon: Shield },
                     ].map(({ step, title, desc, color, Icon }) => (
                         <div key={step}>
                             <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: `${color}15`, border: `1px solid ${color}25`, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '12px' }}>

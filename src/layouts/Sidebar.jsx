@@ -13,6 +13,7 @@ import {
     ChevronLeft,
     ChevronRight,
     Zap,
+    BookOpen,
 } from 'lucide-react'
 
 // ── Nav items definition ──────────────────────────────────────────────────────
@@ -21,6 +22,7 @@ const NAV_ITEMS = [
     { to: '/projects', label: 'Projects', Icon: FolderKanban },
     { to: '/transactions', label: 'Transactions', Icon: ArrowLeftRight },
     { to: '/profile', label: 'Profile', Icon: UserCircle },
+    { to: '/docs', label: 'Docs', Icon: BookOpen },
 ]
 
 export default function Sidebar() {
